@@ -118,6 +118,8 @@ private:
     bool hasNextToken();
     void skipToken();
     bool expectToken(const std::string& expected);
+    void skipExtraSemicolons();
+    bool checkForMultipleSemicolons();
     
     ServerConfig parseServerBlock();
     Location parseLocationBlock();

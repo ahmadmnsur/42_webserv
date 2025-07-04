@@ -93,6 +93,13 @@ void Location::print() const {
     std::cout << std::endl;
     if (!_upload_path.empty())
         std::cout << "      Upload path: " << _upload_path << std::endl;
+    if (!_cgi_extensions.empty()) {
+        std::cout << "      CGI extensions:" << std::endl;
+        for (std::map<std::string, std::string>::const_iterator it = _cgi_extensions.begin(); 
+             it != _cgi_extensions.end(); ++it) {
+            std::cout << "        " << it->first << ": " << it->second << std::endl;
+        }
+    }
     if (!_redirect.empty())
         std::cout << "      Redirect: " << _redirect << std::endl;
 }

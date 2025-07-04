@@ -27,7 +27,28 @@ bool ConfigParser::expectToken(const std::string& expected) {
     }
     
     skipToken();
+    
+    // Check for multiple consecutive semicolons after consuming the expected one
+    if (expected == ";" && checkForMultipleSemicolons()) {
+        return false;
+    }
+    
     return true;
+}
+
+bool ConfigParser::checkForMultipleSemicolons() {
+    if (hasNextToken() && getCurrentToken() == ";") {
+        std::cerr << "Error: Multiple consecutive semicolons found. Use only one semicolon after each directive." << std::endl;
+        _has_errors = true;
+        return true;
+    }
+    return false;
+}
+
+void ConfigParser::skipExtraSemicolons() {
+    while (hasNextToken() && getCurrentToken() == ";") {
+        skipToken();
+    }
 }
 
 void ConfigParser::tokenize(const std::string& content) {
@@ -115,9 +136,9 @@ std::vector<std::string> ConfigParser::parseStringList() {
         // Check if we hit another directive instead of semicolon
         if (token == "root" || token == "autoindex" || token == "index" || 
             token == "methods" || token == "allow_methods" || token == "upload_path" || 
-            token == "cgi_extension" || token == "return" || token == "listen" || 
-            token == "server_name" || token == "error_page" || token == "client_max_body_size" ||
-            token == "location") {
+            token == "cgi_extension" || token == "cgi_extensions" || token == "return" || 
+            token == "listen" || token == "server_name" || token == "error_page" || 
+            token == "client_max_body_size" || token == "location") {
             std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
             _has_errors = true;
             return result;
@@ -152,6 +173,7 @@ Location ConfigParser::parseLocationBlock() {
     // Expect opening brace
     if (!hasNextToken() || getCurrentToken() != "{") {
         std::cerr << "Error: Expected '{' after location path" << std::endl;
+        _has_errors = true;
         return location;
     }
     skipToken();
@@ -201,25 +223,48 @@ Location ConfigParser::parseLocationBlock() {
                 return location;
             }
             skipToken();
-        } else if (directive == "cgi_extension") {
-            if (hasNextToken()) {
-                std::string ext = getNextToken();
-                if (hasNextToken()) {
-                    std::string path = getNextToken();
-                    location.addCgiExtension(ext, path);
-                } else {
-                    std::cerr << "Error: Expected path after cgi_extension" << std::endl;
+        } else if (directive == "cgi_extension" || directive == "cgi_extensions") {
+            // Handle both single extension+path and multiple extensions
+            std::vector<std::string> tokens;
+            while (hasNextToken() && getCurrentToken() != ";" && getCurrentToken() != "}") {
+                std::string token = getCurrentToken();
+                
+                // Check if we hit another directive instead of semicolon
+                if (token == "root" || token == "autoindex" || token == "index" || 
+                    token == "methods" || token == "allow_methods" || token == "upload_path" || 
+                    token == "cgi_extension" || token == "cgi_extensions" || token == "return" || 
+                    token == "listen" || token == "server_name" || token == "error_page" || 
+                    token == "client_max_body_size" || token == "location") {
+                    std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
+                    _has_errors = true;
                     return location;
                 }
-            } else {
-                std::cerr << "Error: Expected extension after 'cgi_extension'" << std::endl;
+                
+                tokens.push_back(getNextToken());
+            }
+            
+            // Check if we stopped because we hit a '}' instead of ';'
+            if (hasNextToken() && getCurrentToken() == "}") {
+                std::cerr << "Error: Expected ';' after directive but found '}'" << std::endl;
+                _has_errors = true;
                 return location;
             }
-            if (!hasNextToken() || getCurrentToken() != ";") {
-                std::cerr << "Error: Expected ';' after cgi_extension directive" << std::endl;
+            
+            if (!expectToken(";")) {
+                _has_errors = true;
                 return location;
             }
-            skipToken();
+            
+            // Parse the tokens - expect pairs of extension and path
+            if (tokens.size() % 2 != 0) {
+                std::cerr << "Error: cgi_extension(s) requires pairs of extension and path" << std::endl;
+                _has_errors = true;
+                return location;
+            }
+            
+            for (size_t i = 0; i < tokens.size(); i += 2) {
+                location.addCgiExtension(tokens[i], tokens[i + 1]);
+            }
         } else if (directive == "return") {
             if (hasNextToken()) {
                 location.setRedirect(getNextToken());
@@ -232,6 +277,10 @@ Location ConfigParser::parseLocationBlock() {
                 return location;
             }
             skipToken();
+        } else if (directive == ";") {
+            std::cerr << "Error: Unexpected semicolon. Multiple consecutive semicolons are not allowed." << std::endl;
+            _has_errors = true;
+            return location;
         } else {
             std::cerr << "Error: Unknown directive '" << directive << "' in location block" << std::endl;
             // Skip unknown directive until semicolon or end of block
@@ -247,6 +296,7 @@ Location ConfigParser::parseLocationBlock() {
     // Expect closing brace
     if (!hasNextToken() || getCurrentToken() != "}") {
         std::cerr << "Error: Expected '}' at end of location block" << std::endl;
+        _has_errors = true;
         return location;
     }
     skipToken();
@@ -260,6 +310,7 @@ ServerConfig ConfigParser::parseServerBlock() {
     // Expect opening brace
     if (!hasNextToken() || getCurrentToken() != "{") {
         std::cerr << "Error: Expected '{' after 'server'" << std::endl;
+        _has_errors = true;
         return config;
     }
     skipToken();
@@ -334,21 +385,21 @@ ServerConfig ConfigParser::parseServerBlock() {
             skipToken();
         } else if (directive == "location") {
             config.addLocation(parseLocationBlock());
+        } else if (directive == ";") {
+            std::cerr << "Error: Unexpected semicolon. Multiple consecutive semicolons are not allowed." << std::endl;
+            _has_errors = true;
+            return config;
         } else {
             std::cerr << "Error: Unknown directive '" << directive << "' in server block" << std::endl;
-            // Skip unknown directive until semicolon or end of block
-            while (hasNextToken() && getCurrentToken() != ";" && getCurrentToken() != "}") {
-                skipToken();
-            }
-            if (hasNextToken() && getCurrentToken() == ";") {
-                skipToken();
-            }
+            _has_errors = true;
+            return config;
         }
     }
     
     // Expect closing brace
     if (!hasNextToken() || getCurrentToken() != "}") {
         std::cerr << "Error: Expected '}' at end of server block" << std::endl;
+        _has_errors = true;
         return config;
     }
     skipToken();
@@ -378,17 +429,20 @@ std::vector<ServerConfig> ConfigParser::parse(const std::string& config_file) {
     while (hasNextToken()) {
         std::string token = getNextToken();
         if (token == "server") {
+            _has_errors = false; // Reset for this server block
+            
             ServerConfig config = parseServerBlock();
+            
             if (!_has_errors) {
                 servers.push_back(config);
             } else {
                 std::cerr << "Error: Failed to parse server block, skipping..." << std::endl;
-                _has_errors = false; // Reset for next server block
+                // Keep _has_errors = true so main() knows there were errors
             }
         } else {
             std::cerr << "Error: Unknown top-level directive '" << token << "'" << std::endl;
             _has_errors = true;
-            // Skip unknown top-level directive
+            // Skip unknown top-level directive but continue parsing other server blocks
             while (hasNextToken() && getCurrentToken() != ";" && getCurrentToken() != "{") {
                 skipToken();
             }
