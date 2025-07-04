@@ -1,0 +1,12 @@
+server {
+    listen 127.0.0.1:8000;
+    server_name test.local;
+
+    location /files {
+        root /var/data;
+        index index.html index.php;
+        autoindex on;
+        methods GET POST;
+    }
+}
+
