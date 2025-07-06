@@ -31,6 +31,10 @@ int main(int argc, char* argv[]) {
     
     try {
         WebServer server(configs);
+        if (!server.isValid()) {
+            std::cerr << "Failed to create server - no valid listening sockets!" << std::endl;
+            return 1;
+        }
         server.run();
     } catch (const std::exception& e) {
         std::cerr << "Server error: " << e.what() << std::endl;

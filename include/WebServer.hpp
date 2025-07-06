@@ -1,4 +1,3 @@
-
 #ifndef WEBSERVER_HPP
 #define WEBSERVER_HPP
 
@@ -33,6 +32,7 @@ public:
     WebServer(const std::vector<ServerConfig>& server_configs);
     ~WebServer();
     void run();
+    bool isValid() const;
 };
 
 #endif
