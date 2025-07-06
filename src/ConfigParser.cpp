@@ -162,7 +162,8 @@ std::vector<std::string> ConfigParser::parseStringList() {
     return result;
 }
 
-Location ConfigParser::parseLocationBlock() {
+Location ConfigParser::parseLocationBlock()
+{
     Location location;
     
     // Parse location path
@@ -266,18 +267,41 @@ Location ConfigParser::parseLocationBlock() {
                 location.addCgiExtension(tokens[i], tokens[i + 1]);
             }
         } else if (directive == "return") {
-            if (hasNextToken()) {
-                location.setRedirect(getNextToken());
+        std::string redirect_value;
+        if (hasNextToken()) {
+            std::string first_token = getNextToken();
+            
+            // Check if first token is a status code (3xx)
+            if (first_token.length() == 3 && 
+                first_token[0] == '3' && 
+                std::isdigit(first_token[1]) && 
+                std::isdigit(first_token[2])) {
+                
+                // This is a status code, expect a URL next
+                if (hasNextToken()) {
+                    std::string url = getNextToken();
+                    redirect_value = first_token + " " + url;
+                } else {
+                    std::cerr << "Error: Expected URL after return status code" << std::endl;
+                    _has_errors = true;
+                    return location;
+                }
             } else {
-                std::cerr << "Error: Expected value after 'return'" << std::endl;
-                return location;
+                // This is just a URL without status code
+                redirect_value = first_token;
             }
-            if (!hasNextToken() || getCurrentToken() != ";") {
-                std::cerr << "Error: Expected ';' after return directive" << std::endl;
-                return location;
-            }
-            skipToken();
-        } else if (directive == ";") {
+            
+            location.setRedirect(redirect_value);
+        } else {
+            std::cerr << "Error: Expected value after 'return'" << std::endl;
+            _has_errors = true;
+            return location;
+        }
+        if (!expectToken(";")) {
+            _has_errors = true;
+            return location;
+        }
+            } else if (directive == ";") {
             std::cerr << "Error: Unexpected semicolon. Multiple consecutive semicolons are not allowed." << std::endl;
             _has_errors = true;
             return location;
