@@ -51,6 +51,12 @@ void ConfigParser::skipExtraSemicolons() {
     }
 }
 
+bool ConfigParser::isValidHttpMethod(const std::string& method) const {
+    return (method == "GET" || method == "POST" || method == "DELETE" || 
+            method == "PUT" || method == "HEAD" || method == "OPTIONS" || 
+            method == "PATCH" || method == "CONNECT" || method == "TRACE");
+}
+
 void ConfigParser::tokenize(const std::string& content) {
     _tokens.clear();
     std::string current_token;
@@ -162,8 +168,49 @@ std::vector<std::string> ConfigParser::parseStringList() {
     return result;
 }
 
-Location ConfigParser::parseLocationBlock()
-{
+std::vector<std::string> ConfigParser::parseHttpMethods() {
+    std::vector<std::string> result;
+    
+    while (hasNextToken() && getCurrentToken() != ";" && getCurrentToken() != "}") {
+        std::string token = getCurrentToken();
+        
+        // Check if we hit another directive instead of semicolon
+        if (token == "root" || token == "autoindex" || token == "index" || 
+            token == "methods" || token == "allow_methods" || token == "upload_path" || 
+            token == "cgi_extension" || token == "cgi_extensions" || token == "return" || 
+            token == "listen" || token == "server_name" || token == "error_page" || 
+            token == "client_max_body_size" || token == "location") {
+            std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
+            _has_errors = true;
+            return result;
+        }
+        
+        // Validate HTTP method
+        if (!isValidHttpMethod(token)) {
+            std::cerr << "Error: Invalid HTTP method '" << token << "'. Valid methods are: GET, POST, DELETE, PUT, HEAD, OPTIONS, PATCH, CONNECT, TRACE" << std::endl;
+            _has_errors = true;
+            return result;
+        }
+        
+        result.push_back(getNextToken());
+    }
+    
+    // Check if we stopped because we hit a '}' instead of ';'
+    if (hasNextToken() && getCurrentToken() == "}") {
+        std::cerr << "Error: Expected ';' after directive but found '}'" << std::endl;
+        _has_errors = true;
+        return result;
+    }
+    
+    if (!expectToken(";")) {
+        _has_errors = true;
+        return result;
+    }
+    
+    return result;
+}
+
+Location ConfigParser::parseLocationBlock() {
     Location location;
     
     // Parse location path
@@ -184,7 +231,7 @@ Location ConfigParser::parseLocationBlock()
         std::string directive = getNextToken();
         
         if (directive == "allow_methods" || directive == "methods") {
-            location.setMethods(parseStringList());
+            location.setMethods(parseHttpMethods());
         } else if (directive == "root") {
             if (hasNextToken()) {
                 location.setRoot(getNextToken());
@@ -267,41 +314,41 @@ Location ConfigParser::parseLocationBlock()
                 location.addCgiExtension(tokens[i], tokens[i + 1]);
             }
         } else if (directive == "return") {
-        std::string redirect_value;
-        if (hasNextToken()) {
-            std::string first_token = getNextToken();
-            
-            // Check if first token is a status code (3xx)
-            if (first_token.length() == 3 && 
-                first_token[0] == '3' && 
-                std::isdigit(first_token[1]) && 
-                std::isdigit(first_token[2])) {
+            std::string redirect_value;
+            if (hasNextToken()) {
+                std::string first_token = getNextToken();
                 
-                // This is a status code, expect a URL next
-                if (hasNextToken()) {
-                    std::string url = getNextToken();
-                    redirect_value = first_token + " " + url;
+                // Check if first token is a status code (3xx)
+                if (first_token.length() == 3 && 
+                    first_token[0] == '3' && 
+                    std::isdigit(first_token[1]) && 
+                    std::isdigit(first_token[2])) {
+                    
+                    // This is a status code, expect a URL next
+                    if (hasNextToken()) {
+                        std::string url = getNextToken();
+                        redirect_value = first_token + " " + url;
+                    } else {
+                        std::cerr << "Error: Expected URL after return status code" << std::endl;
+                        _has_errors = true;
+                        return location;
+                    }
                 } else {
-                    std::cerr << "Error: Expected URL after return status code" << std::endl;
-                    _has_errors = true;
-                    return location;
+                    // This is just a URL without status code
+                    redirect_value = first_token;
                 }
+                
+                location.setRedirect(redirect_value);
             } else {
-                // This is just a URL without status code
-                redirect_value = first_token;
+                std::cerr << "Error: Expected value after 'return'" << std::endl;
+                _has_errors = true;
+                return location;
             }
-            
-            location.setRedirect(redirect_value);
-        } else {
-            std::cerr << "Error: Expected value after 'return'" << std::endl;
-            _has_errors = true;
-            return location;
-        }
-        if (!expectToken(";")) {
-            _has_errors = true;
-            return location;
-        }
-            } else if (directive == ";") {
+            if (!expectToken(";")) {
+                _has_errors = true;
+                return location;
+            }
+        } else if (directive == ";") {
             std::cerr << "Error: Unexpected semicolon. Multiple consecutive semicolons are not allowed." << std::endl;
             _has_errors = true;
             return location;
