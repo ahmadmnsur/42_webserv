@@ -352,15 +352,12 @@ Location ConfigParser::parseLocationBlock() {
             std::cerr << "Error: Unexpected semicolon. Multiple consecutive semicolons are not allowed." << std::endl;
             _has_errors = true;
             return location;
-        } else {
+        } 
+        else
+        {
             std::cerr << "Error: Unknown directive '" << directive << "' in location block" << std::endl;
-            // Skip unknown directive until semicolon or end of block
-            while (hasNextToken() && getCurrentToken() != ";" && getCurrentToken() != "}") {
-                skipToken();
-            }
-            if (hasNextToken() && getCurrentToken() == ";") {
-                skipToken();
-            }
+            _has_errors = true;
+            return location;
         }
     }
     
