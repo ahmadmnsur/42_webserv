@@ -11,8 +11,12 @@ SOURCES = main.cpp \
           Location.cpp \
           ServerConfig.cpp \
           ConfigParser.cpp \
+          ConfigTokenizer.cpp \
+          ConfigValidator.cpp \
           ClientData.cpp \
-          WebServer.cpp
+          WebServer.cpp \
+          SocketManager.cpp \
+          ConnectionHandler.cpp
 
 OBJECTS = $(SOURCES:%.cpp=$(OBJDIR)/%.o)
 
@@ -20,8 +24,12 @@ OBJECTS = $(SOURCES:%.cpp=$(OBJDIR)/%.o)
 HEADERS = $(INCDIR)/Location.hpp \
           $(INCDIR)/ServerConfig.hpp \
           $(INCDIR)/ConfigParser.hpp \
+          $(INCDIR)/ConfigTokenizer.hpp \
+          $(INCDIR)/ConfigValidator.hpp \
           $(INCDIR)/ClientData.hpp \
-          $(INCDIR)/WebServer.hpp
+          $(INCDIR)/WebServer.hpp \
+          $(INCDIR)/SocketManager.hpp \
+          $(INCDIR)/ConnectionHandler.hpp
 
 all: $(NAME)
 

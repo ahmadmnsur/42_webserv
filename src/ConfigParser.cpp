@@ -5,30 +5,43 @@
 #include <cctype>
 #include <cstdlib>
 
-ConfigParser::ConfigParser() : _current_token(0), _has_errors(false) {}
+/*
+ * Default constructor for ConfigParser
+ * Initializes the parser with empty state
+ */
+ConfigParser::ConfigParser() {}
 
+/*
+ * Destructor for ConfigParser
+ * Cleans up any allocated resources
+ */
 ConfigParser::~ConfigParser() {}
 
+/*
+ * Checks if the parser has encountered any errors during parsing
+ * Returns true if errors exist, false otherwise
+ */
 bool ConfigParser::hasErrors() const {
-    return _has_errors;
+    return _validator.hasErrors();
 }
 
+/*
+ * Validates that the current token matches the expected token
+ * Advances the tokenizer if the token matches
+ * Returns true if token matches, false otherwise
+ */
 bool ConfigParser::expectToken(const std::string& expected) {
     if (!hasNextToken()) {
-        std::cerr << "Error: Expected '" << expected << "' but reached end of file" << std::endl;
-        _has_errors = true;
+        _validator.validateToken(expected, "");
         return false;
     }
     
-    if (getCurrentToken() != expected) {
-        std::cerr << "Error: Expected '" << expected << "' but found '" << getCurrentToken() << "'" << std::endl;
-        _has_errors = true;
+    if (!_validator.validateToken(expected, getCurrentToken())) {
         return false;
     }
     
     skipToken();
     
-    // Check for multiple consecutive semicolons after consuming the expected one
     if (expected == ";" && checkForMultipleSemicolons()) {
         return false;
     }
@@ -36,178 +49,160 @@ bool ConfigParser::expectToken(const std::string& expected) {
     return true;
 }
 
+/*
+ * Checks for multiple consecutive semicolons in the token stream
+ * Returns true if multiple semicolons are found, false otherwise
+ */
 bool ConfigParser::checkForMultipleSemicolons() {
-    if (hasNextToken() && getCurrentToken() == ";") {
-        std::cerr << "Error: Multiple consecutive semicolons found. Use only one semicolon after each directive." << std::endl;
-        _has_errors = true;
-        return true;
+    if (hasNextToken()) {
+        return !_validator.checkMultipleSemicolons(";", getCurrentToken());
     }
     return false;
 }
 
+/*
+ * Returns the current token from the tokenizer
+ * Does not advance the tokenizer position
+ */
+std::string ConfigParser::getCurrentToken() {
+    return _tokenizer.getCurrentToken();
+}
+
+/*
+ * Returns the next token and advances the tokenizer position
+ * Used to consume tokens during parsing
+ */
+std::string ConfigParser::getNextToken() {
+    return _tokenizer.getNextToken();
+}
+
+/*
+ * Checks if there are more tokens available for parsing
+ * Returns true if more tokens exist, false otherwise
+ */
+bool ConfigParser::hasNextToken() {
+    return _tokenizer.hasNextToken();
+}
+
+/*
+ * Skips the current token and advances to the next one
+ * Used to consume tokens without returning their value
+ */
+void ConfigParser::skipToken() {
+    _tokenizer.skipToken();
+}
+
+/*
+ * Skips any extra semicolons in the token stream
+ * Continues until a non-semicolon token is found
+ */
 void ConfigParser::skipExtraSemicolons() {
     while (hasNextToken() && getCurrentToken() == ";") {
         skipToken();
     }
 }
 
-bool ConfigParser::isValidHttpMethod(const std::string& method) const {
-    return (method == "GET" || method == "POST" || method == "DELETE");
-}
-
-void ConfigParser::tokenize(const std::string& content) {
-    _tokens.clear();
-    std::string current_token;
-    bool in_string = false;
+/*
+ * Skips tokens until the end of the current block
+ * Uses brace counting to handle nested blocks correctly
+ * Assumes we're already inside a block when called
+ */
+void ConfigParser::skipToEndOfBlock() {
+    int brace_count = 1; // Assume we're already inside a block
     
-    for (size_t i = 0; i < content.length(); ++i) {
-        char c = content[i];
-        
-        if (c == '"' && !in_string) {
-            in_string = true;
-            continue;
-        } else if (c == '"' && in_string) {
-            in_string = false;
-            if (!current_token.empty()) {
-                _tokens.push_back(current_token);
-                current_token.clear();
-            }
-            continue;
-        }
-        
-        if (in_string) {
-            current_token += c;
-            continue;
-        }
-        
-        if (std::isspace(c) || c == '#') {
-            if (!current_token.empty()) {
-                _tokens.push_back(current_token);
-                current_token.clear();
-            }
-            if (c == '#') {
-                // Skip comment until end of line
-                while (i < content.length() && content[i] != '\n') {
-                    ++i;
-                }
-            }
-        } else if (c == '{' || c == '}' || c == ';') {
-            if (!current_token.empty()) {
-                _tokens.push_back(current_token);
-                current_token.clear();
-            }
-            _tokens.push_back(std::string(1, c));
-        } else {
-            current_token += c;
+    // Skip until we find the matching closing brace
+    while (hasNextToken() && brace_count > 0) {
+        std::string token = getNextToken();
+        if (token == "{") {
+            brace_count++;
+        } else if (token == "}") {
+            brace_count--;
         }
     }
-    
-    if (!current_token.empty()) {
-        _tokens.push_back(current_token);
-    }
 }
 
-std::string ConfigParser::getCurrentToken() {
-    if (_current_token < _tokens.size()) {
-        return _tokens[_current_token];
-    }
-    return "";
-}
 
-std::string ConfigParser::getNextToken() {
-    if (_current_token < _tokens.size()) {
-        return _tokens[_current_token++];
-    }
-    return "";
-}
-
-bool ConfigParser::hasNextToken() {
-    return _current_token < _tokens.size();
-}
-
-void ConfigParser::skipToken() {
-    if (_current_token < _tokens.size()) {
-        _current_token++;
-    }
-}
-
+/*
+ * Parses a list of string values from the token stream
+ * Continues until a semicolon or closing brace is found
+ * Validates that directive keywords are not mixed with values
+ * Returns vector of parsed string values
+ */
 std::vector<std::string> ConfigParser::parseStringList() {
     std::vector<std::string> result;
     
     while (hasNextToken() && getCurrentToken() != ";" && getCurrentToken() != "}") {
         std::string token = getCurrentToken();
         
-        // Check if we hit another directive instead of semicolon
         if (token == "root" || token == "autoindex" || token == "index" || 
             token == "methods" || token == "allow_methods" || token == "upload_path" || 
             token == "cgi_extension" || token == "cgi_extensions" || token == "return" || 
             token == "listen" || token == "server_name" || token == "error_page" || 
             token == "client_max_body_size" || token == "location") {
             std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
-            _has_errors = true;
             return result;
         }
         
         result.push_back(getNextToken());
     }
     
-    // Check if we stopped because we hit a '}' instead of ';'
     if (hasNextToken() && getCurrentToken() == "}") {
         std::cerr << "Error: Expected ';' after directive but found '}'" << std::endl;
-        _has_errors = true;
         return result;
     }
     
     if (!expectToken(";")) {
-        _has_errors = true;
         return result;
     }
     
     return result;
 }
 
+/*
+ * Parses a list of HTTP methods from the token stream
+ * Validates each method using the validator
+ * Returns vector of valid HTTP methods (GET, POST, DELETE)
+ */
 std::vector<std::string> ConfigParser::parseHttpMethods() {
     std::vector<std::string> result;
     
     while (hasNextToken() && getCurrentToken() != ";" && getCurrentToken() != "}") {
         std::string token = getCurrentToken();
         
-        // Check if we hit another directive instead of semicolon
         if (token == "root" || token == "autoindex" || token == "index" || 
             token == "methods" || token == "allow_methods" || token == "upload_path" || 
             token == "cgi_extension" || token == "cgi_extensions" || token == "return" || 
             token == "listen" || token == "server_name" || token == "error_page" || 
             token == "client_max_body_size" || token == "location") {
             std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
-            _has_errors = true;
             return result;
         }
         
         // Validate HTTP method
-        if (!isValidHttpMethod(token)) {
-            std::cerr << "Error: Invalid HTTP method '" << token << "'. Valid methods are: GET, POST, DELETE" << std::endl;
-            _has_errors = true;
+        if (!_validator.validateHttpMethod(token)) {
             return result;
         }
         
         result.push_back(getNextToken());
     }
     
-    // Check if we stopped because we hit a '}' instead of ';'
     if (hasNextToken() && getCurrentToken() == "}") {
         std::cerr << "Error: Expected ';' after directive but found '}'" << std::endl;
-        _has_errors = true;
         return result;
     }
     
     if (!expectToken(";")) {
-        _has_errors = true;
         return result;
     }
     
     return result;
 }
 
+/*
+ * Parses a location block from the configuration file
+ * Handles location path and all location-specific directives
+ * Returns a configured Location object
+ */
 Location ConfigParser::parseLocationBlock() {
     Location location;
     
@@ -219,7 +214,6 @@ Location ConfigParser::parseLocationBlock() {
     // Expect opening brace
     if (!hasNextToken() || getCurrentToken() != "{") {
         std::cerr << "Error: Expected '{' after location path" << std::endl;
-        _has_errors = true;
         return location;
     }
     skipToken();
@@ -282,34 +276,48 @@ Location ConfigParser::parseLocationBlock() {
                     token == "listen" || token == "server_name" || token == "error_page" || 
                     token == "client_max_body_size" || token == "location") {
                     std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
-                    _has_errors = true;
                     return location;
                 }
                 
                 tokens.push_back(getNextToken());
             }
             
-            // Check if we stopped because we hit a '}' instead of ';'
             if (hasNextToken() && getCurrentToken() == "}") {
                 std::cerr << "Error: Expected ';' after directive but found '}'" << std::endl;
-                _has_errors = true;
                 return location;
             }
             
             if (!expectToken(";")) {
-                _has_errors = true;
                 return location;
             }
             
-            // Parse the tokens - expect pairs of extension and path
+            // CGI extensions must be provided as extension-path pairs
+            // Only .py and .php extensions are supported
             if (tokens.size() % 2 != 0) {
                 std::cerr << "Error: cgi_extension(s) requires pairs of extension and path" << std::endl;
-                _has_errors = true;
+                _validator.addError("cgi_extension(s) requires pairs of extension and path");
                 return location;
             }
             
             for (size_t i = 0; i < tokens.size(); i += 2) {
-                location.addCgiExtension(tokens[i], tokens[i + 1]);
+                std::string extension = tokens[i];
+                std::string path = tokens[i + 1];
+                
+                // Validate that only .py and .php extensions are supported
+                if (extension != ".py" && extension != ".php") {
+                    std::cerr << "Error: Unsupported CGI extension '" << extension << "'. Only .py and .php are supported." << std::endl;
+                    _validator.addError("Unsupported CGI extension '" + extension + "'. Only .py and .php are supported.");
+                    return location;
+                }
+                
+                // Validate that path is provided (not empty and starts with /)
+                if (path.empty() || path[0] != '/') {
+                    std::cerr << "Error: CGI path must be an absolute path starting with '/'" << std::endl;
+                    _validator.addError("CGI path must be an absolute path starting with '/'");
+                    return location;
+                }
+                
+                location.addCgiExtension(extension, path);
             }
         } else if (directive == "return") {
             std::string redirect_value;
@@ -328,7 +336,6 @@ Location ConfigParser::parseLocationBlock() {
                         redirect_value = first_token + " " + url;
                     } else {
                         std::cerr << "Error: Expected URL after return status code" << std::endl;
-                        _has_errors = true;
                         return location;
                     }
                 } else {
@@ -339,30 +346,25 @@ Location ConfigParser::parseLocationBlock() {
                 location.setRedirect(redirect_value);
             } else {
                 std::cerr << "Error: Expected value after 'return'" << std::endl;
-                _has_errors = true;
                 return location;
             }
             if (!expectToken(";")) {
-                _has_errors = true;
                 return location;
             }
         } else if (directive == ";") {
-            std::cerr << "Error: Unexpected semicolon. Multiple consecutive semicolons are not allowed." << std::endl;
-            _has_errors = true;
+            _validator.validateDirective(directive, "location");
             return location;
         } 
         else
         {
-            std::cerr << "Error: Unknown directive '" << directive << "' in location block" << std::endl;
-            _has_errors = true;
+            _validator.validateDirective(directive, "location");
             return location;
         }
     }
     
-    // Expect closing brace
     if (!hasNextToken() || getCurrentToken() != "}") {
         std::cerr << "Error: Expected '}' at end of location block" << std::endl;
-        _has_errors = true;
+        _validator.addError("Expected '}' at end of location block");
         return location;
     }
     skipToken();
@@ -370,13 +372,17 @@ Location ConfigParser::parseLocationBlock() {
     return location;
 }
 
+/*
+ * Parses a server block from the configuration file
+ * Handles all server-level directives (listen, server_name, error_page, etc.)
+ * Returns a configured ServerConfig object
+ */
 ServerConfig ConfigParser::parseServerBlock() {
     ServerConfig config;
     
     // Expect opening brace
     if (!hasNextToken() || getCurrentToken() != "{") {
         std::cerr << "Error: Expected '{' after 'server'" << std::endl;
-        _has_errors = true;
         return config;
     }
     skipToken();
@@ -397,13 +403,13 @@ ServerConfig ConfigParser::parseServerBlock() {
                 }
             } else {
                 std::cerr << "Error: Expected value after 'listen'" << std::endl;
+                _validator.addError("Expected value after 'listen'");
                 return config;
             }
-            if (!hasNextToken() || getCurrentToken() != ";") {
-                std::cerr << "Error: Expected ';' after listen directive" << std::endl;
+            if (!expectToken(";")) {
+                _validator.addError("Expected ';' after listen directive");
                 return config;
             }
-            skipToken();
         } else if (directive == "server_name") {
             config.setServerNames(parseStringList());
         } else if (directive == "error_page") {
@@ -452,20 +458,17 @@ ServerConfig ConfigParser::parseServerBlock() {
         } else if (directive == "location") {
             config.addLocation(parseLocationBlock());
         } else if (directive == ";") {
-            std::cerr << "Error: Unexpected semicolon. Multiple consecutive semicolons are not allowed." << std::endl;
-            _has_errors = true;
+            _validator.validateDirective(directive, "server");
             return config;
         } else {
-            std::cerr << "Error: Unknown directive '" << directive << "' in server block" << std::endl;
-            _has_errors = true;
+            _validator.validateDirective(directive, "server");
             return config;
         }
     }
     
-    // Expect closing brace
     if (!hasNextToken() || getCurrentToken() != "}") {
         std::cerr << "Error: Expected '}' at end of server block" << std::endl;
-        _has_errors = true;
+        _validator.addError("Expected '}' at end of server block");
         return config;
     }
     skipToken();
@@ -473,13 +476,18 @@ ServerConfig ConfigParser::parseServerBlock() {
     return config;
 }
 
+/*
+ * Main parsing function that reads and parses the configuration file
+ * Opens the file, tokenizes its content, and parses server blocks
+ * Returns a vector of ServerConfig objects for all valid server blocks
+ */
 std::vector<ServerConfig> ConfigParser::parse(const std::string& config_file) {
     std::vector<ServerConfig> servers;
     std::ifstream file(config_file.c_str());
     
     if (!file.is_open()) {
         std::cerr << "Error: Could not open config file: " << config_file << std::endl;
-        _has_errors = true;
+        _validator.addError("Could not open config file: " + config_file);
         return servers;
     }
     
@@ -488,42 +496,27 @@ std::vector<ServerConfig> ConfigParser::parse(const std::string& config_file) {
     std::string content = buffer.str();
     file.close();
     
-    tokenize(content);
-    _current_token = 0;
-    _has_errors = false;
+    _tokenizer.tokenize(content);
+    _validator.resetErrors();
     
     while (hasNextToken()) {
         std::string token = getNextToken();
         if (token == "server") {
-            _has_errors = false; // Reset for this server block
-            
             ServerConfig config = parseServerBlock();
             
-            if (!_has_errors) {
+            if (!_validator.hasErrors()) {
                 servers.push_back(config);
             } else {
-                std::cerr << "Error: Failed to parse server block, skipping..." << std::endl;
-                // Keep _has_errors = true so main() knows there were errors
+                std::cerr << "Error: Failed to parse server block due to syntax errors" << std::endl;
+                // Don't skip - return empty servers list to signal failure
+                servers.clear();
+                return servers;
             }
         } else {
             std::cerr << "Error: Unknown top-level directive '" << token << "'" << std::endl;
-            _has_errors = true;
-            // Skip unknown top-level directive but continue parsing other server blocks
-            while (hasNextToken() && getCurrentToken() != ";" && getCurrentToken() != "{") {
-                skipToken();
-            }
-            if (hasNextToken() && getCurrentToken() == ";") {
-                skipToken();
-            } else if (hasNextToken() && getCurrentToken() == "{") {
-                // Skip block
-                int brace_count = 1;
-                skipToken();
-                while (hasNextToken() && brace_count > 0) {
-                    std::string t = getNextToken();
-                    if (t == "{") brace_count++;
-                    else if (t == "}") brace_count--;
-                }
-            }
+            _validator.addError("Unknown top-level directive '" + token + "'");
+            servers.clear();
+            return servers;
         }
     }
     

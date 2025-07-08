@@ -3,29 +3,30 @@
 
 #include "ServerConfig.hpp"
 #include "Location.hpp"
+#include "ConfigTokenizer.hpp"
+#include "ConfigValidator.hpp"
 #include <string>
 #include <vector>
 
 class ConfigParser {
 private:
-    std::vector<std::string> _tokens;
-    size_t _current_token;
-    bool _has_errors;
+    ConfigTokenizer _tokenizer;
+    ConfigValidator _validator;
     
-    void tokenize(const std::string& content);
-    std::string getCurrentToken();
-    std::string getNextToken();
-    bool hasNextToken();
-    void skipToken();
     bool expectToken(const std::string& expected);
     void skipExtraSemicolons();
     bool checkForMultipleSemicolons();
-    bool isValidHttpMethod(const std::string& method) const;
+    void skipToEndOfBlock();
     
     ServerConfig parseServerBlock();
     Location parseLocationBlock();
     std::vector<std::string> parseStringList();
     std::vector<std::string> parseHttpMethods();
+    
+    std::string getCurrentToken();
+    std::string getNextToken();
+    bool hasNextToken();
+    void skipToken();
     
 public:
     ConfigParser();
