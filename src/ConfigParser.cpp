@@ -52,9 +52,7 @@ void ConfigParser::skipExtraSemicolons() {
 }
 
 bool ConfigParser::isValidHttpMethod(const std::string& method) const {
-    return (method == "GET" || method == "POST" || method == "DELETE" || 
-            method == "PUT" || method == "HEAD" || method == "OPTIONS" || 
-            method == "PATCH" || method == "CONNECT" || method == "TRACE");
+    return (method == "GET" || method == "POST" || method == "DELETE");
 }
 
 void ConfigParser::tokenize(const std::string& content) {
@@ -187,7 +185,7 @@ std::vector<std::string> ConfigParser::parseHttpMethods() {
         
         // Validate HTTP method
         if (!isValidHttpMethod(token)) {
-            std::cerr << "Error: Invalid HTTP method '" << token << "'. Valid methods are: GET, POST, DELETE, PUT, HEAD, OPTIONS, PATCH, CONNECT, TRACE" << std::endl;
+            std::cerr << "Error: Invalid HTTP method '" << token << "'. Valid methods are: GET, POST, DELETE" << std::endl;
             _has_errors = true;
             return result;
         }
