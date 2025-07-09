@@ -24,16 +24,12 @@ ConnectionHandler::~ConnectionHandler() {
  * Used for graceful shutdown
  */
 void ConnectionHandler::closeAllClients() {
-    std::cout << "Closing " << _clients.size() << " client connections..." << std::endl;
     
     for (std::map<int, ClientData>::iterator it = _clients.begin(); 
          it != _clients.end(); ++it) {
-        std::cout << "Closing client socket " << it->first << std::endl;
         _socket_manager.closeSocket(it->first);
     }
     _clients.clear();
-    
-    std::cout << "All client connections closed." << std::endl;
 }
 
 /*

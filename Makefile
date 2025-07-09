@@ -16,7 +16,8 @@ SOURCES = main.cpp \
           ClientData.cpp \
           WebServer.cpp \
           SocketManager.cpp \
-          ConnectionHandler.cpp
+          ConnectionHandler.cpp \
+		  SignalHandler.cpp
 
 OBJECTS = $(SOURCES:%.cpp=$(OBJDIR)/%.o)
 
@@ -29,7 +30,8 @@ HEADERS = $(INCDIR)/Location.hpp \
           $(INCDIR)/ClientData.hpp \
           $(INCDIR)/WebServer.hpp \
           $(INCDIR)/SocketManager.hpp \
-          $(INCDIR)/ConnectionHandler.hpp
+          $(INCDIR)/ConnectionHandler.hpp \
+		  $(INCDIR)/SignalManager.hpp
 
 all: $(NAME)
 

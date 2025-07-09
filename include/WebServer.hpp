@@ -4,12 +4,9 @@
 #include "ServerConfig.hpp"
 #include "ConnectionHandler.hpp"
 #include "SocketManager.hpp"
+#include "SignalManager.hpp"
 #include <poll.h>
 #include <vector>
-#include <signal.h>
-
-// External global for signal handling
-extern volatile sig_atomic_t g_shutdown_requested;
 
 class WebServer {
 private:
@@ -18,6 +15,7 @@ private:
     std::vector<pollfd> _poll_fds;
     ConnectionHandler _connection_handler;
     SocketManager _socket_manager;
+    const SignalManager& _signal_manager; // Reference to signal manager
     
     void setupSockets();
     void handleNewConnection(int listen_sock);
@@ -26,7 +24,7 @@ private:
     void cleanup();
     
 public:
-    WebServer(const std::vector<ServerConfig>& server_configs);
+    WebServer(const std::vector<ServerConfig>& server_configs, const SignalManager& signal_manager);
     ~WebServer();
     void run();
     bool isValid() const;
