@@ -225,6 +225,12 @@ Location ConfigParser::parseLocationBlock() {
     }
     skipToken();
     
+    // Track singleton directives to detect duplicates
+    bool root_found = false;
+    bool upload_path_found = false;
+    bool return_found = false;
+    bool autoindex_found = false;
+    
     // Parse location directives
     while (hasNextToken() && getCurrentToken() != "}") {
         std::string directive = getNextToken();
@@ -237,6 +243,13 @@ Location ConfigParser::parseLocationBlock() {
             }
             location.setMethods(methods);
         } else if (directive == "root") {
+            // Check for duplicate root directive
+            if (root_found) {
+                std::cerr << "Error: Duplicate 'root' directive found in location block" << std::endl;
+                _validator.addError("Duplicate 'root' directive found in location block");
+                return location;
+            }
+            root_found = true;
             if (hasNextToken()) {
                 location.setRoot(getNextToken());
             } else {
@@ -251,6 +264,13 @@ Location ConfigParser::parseLocationBlock() {
             }
             skipToken();
         } else if (directive == "autoindex") {
+            // Check for duplicate autoindex directive
+            if (autoindex_found) {
+                std::cerr << "Error: Duplicate 'autoindex' directive found in location block" << std::endl;
+                _validator.addError("Duplicate 'autoindex' directive found in location block");
+                return location;
+            }
+            autoindex_found = true;
             if (hasNextToken()) {
                 std::string value = getNextToken();
                 location.setAutoindex(value == "on");
@@ -273,6 +293,13 @@ Location ConfigParser::parseLocationBlock() {
             }
             location.setIndexFiles(indexFiles);
         } else if (directive == "upload_path") {
+            // Check for duplicate upload_path directive
+            if (upload_path_found) {
+                std::cerr << "Error: Duplicate 'upload_path' directive found in location block" << std::endl;
+                _validator.addError("Duplicate 'upload_path' directive found in location block");
+                return location;
+            }
+            upload_path_found = true;
             if (hasNextToken()) {
                 location.setUploadPath(getNextToken());
             } else {
@@ -346,6 +373,13 @@ Location ConfigParser::parseLocationBlock() {
                 location.addCgiExtension(extension, path);
             }
         } else if (directive == "return") {
+            // Check for duplicate return directive
+            if (return_found) {
+                std::cerr << "Error: Duplicate 'return' directive found in location block" << std::endl;
+                _validator.addError("Duplicate 'return' directive found in location block");
+                return location;
+            }
+            return_found = true;
             std::string redirect_value;
             if (hasNextToken()) {
                 std::string first_token = getNextToken();
@@ -409,6 +443,7 @@ Location ConfigParser::parseLocationBlock() {
 ServerConfig ConfigParser::parseServerBlock() {
     ServerConfig config;
     bool listen_directive_found = false;
+    bool client_max_body_size_found = false;
     
     // Expect opening brace
     if (!hasNextToken() || getCurrentToken() != "{") {
@@ -477,6 +512,13 @@ ServerConfig ConfigParser::parseServerBlock() {
             }
             skipToken();
         } else if (directive == "client_max_body_size") {
+            // Check for duplicate client_max_body_size directive
+            if (client_max_body_size_found) {
+                std::cerr << "Error: Duplicate 'client_max_body_size' directive found in server block" << std::endl;
+                _validator.addError("Duplicate 'client_max_body_size' directive found in server block");
+                return config;
+            }
+            client_max_body_size_found = true;
             if (hasNextToken()) {
                 std::string size_str = getNextToken();
                 size_t max_body_size = std::atoi(size_str.c_str());
