@@ -121,7 +121,6 @@ void ConfigParser::skipToEndOfBlock() {
     }
 }
 
-
 /*
  * Parses a list of string values from the token stream
  * Continues until a semicolon or closing brace is found
@@ -140,6 +139,7 @@ std::vector<std::string> ConfigParser::parseStringList() {
             token == "listen" || token == "server_name" || token == "error_page" || 
             token == "client_max_body_size" || token == "location") {
             std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
+            _validator.addError("Expected ';' after directive but found directive '" + token + "'");
             return result;
         }
         
@@ -148,10 +148,12 @@ std::vector<std::string> ConfigParser::parseStringList() {
     
     if (hasNextToken() && getCurrentToken() == "}") {
         std::cerr << "Error: Expected ';' after directive but found '}'" << std::endl;
+        _validator.addError("Expected ';' after directive but found '}'");
         return result;
     }
     
     if (!expectToken(";")) {
+        _validator.addError("Expected ';' after directive");
         return result;
     }
     
@@ -175,11 +177,13 @@ std::vector<std::string> ConfigParser::parseHttpMethods() {
             token == "listen" || token == "server_name" || token == "error_page" || 
             token == "client_max_body_size" || token == "location") {
             std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
+            _validator.addError("Expected ';' after directive but found directive '" + token + "'");
             return result;
         }
         
         // Validate HTTP method
         if (!_validator.validateHttpMethod(token)) {
+            _validator.addError("Invalid HTTP method: " + token);
             return result;
         }
         
@@ -188,10 +192,12 @@ std::vector<std::string> ConfigParser::parseHttpMethods() {
     
     if (hasNextToken() && getCurrentToken() == "}") {
         std::cerr << "Error: Expected ';' after directive but found '}'" << std::endl;
+        _validator.addError("Expected ';' after directive but found '}'");
         return result;
     }
     
     if (!expectToken(";")) {
+        _validator.addError("Expected ';' after methods directive");
         return result;
     }
     
@@ -214,6 +220,7 @@ Location ConfigParser::parseLocationBlock() {
     // Expect opening brace
     if (!hasNextToken() || getCurrentToken() != "{") {
         std::cerr << "Error: Expected '{' after location path" << std::endl;
+        _validator.addError("Expected '{' after location path");
         return location;
     }
     skipToken();
@@ -223,16 +230,23 @@ Location ConfigParser::parseLocationBlock() {
         std::string directive = getNextToken();
         
         if (directive == "allow_methods" || directive == "methods") {
-            location.setMethods(parseHttpMethods());
+            std::vector<std::string> methods = parseHttpMethods();
+            // Check for errors after parsing methods
+            if (_validator.hasErrors()) {
+                return location;
+            }
+            location.setMethods(methods);
         } else if (directive == "root") {
             if (hasNextToken()) {
                 location.setRoot(getNextToken());
             } else {
                 std::cerr << "Error: Expected value after 'root'" << std::endl;
+                _validator.addError("Expected value after 'root'");
                 return location;
             }
             if (!hasNextToken() || getCurrentToken() != ";") {
                 std::cerr << "Error: Expected ';' after root directive" << std::endl;
+                _validator.addError("Expected ';' after root directive");
                 return location;
             }
             skipToken();
@@ -242,24 +256,33 @@ Location ConfigParser::parseLocationBlock() {
                 location.setAutoindex(value == "on");
             } else {
                 std::cerr << "Error: Expected value after 'autoindex'" << std::endl;
+                _validator.addError("Expected value after 'autoindex'");
                 return location;
             }
             if (!hasNextToken() || getCurrentToken() != ";") {
                 std::cerr << "Error: Expected ';' after autoindex directive" << std::endl;
+                _validator.addError("Expected ';' after autoindex directive");
                 return location;
             }
             skipToken();
         } else if (directive == "index") {
-            location.setIndexFiles(parseStringList());
+            std::vector<std::string> indexFiles = parseStringList();
+            // Check for errors after parsing string list
+            if (_validator.hasErrors()) {
+                return location;
+            }
+            location.setIndexFiles(indexFiles);
         } else if (directive == "upload_path") {
             if (hasNextToken()) {
                 location.setUploadPath(getNextToken());
             } else {
                 std::cerr << "Error: Expected value after 'upload_path'" << std::endl;
+                _validator.addError("Expected value after 'upload_path'");
                 return location;
             }
             if (!hasNextToken() || getCurrentToken() != ";") {
                 std::cerr << "Error: Expected ';' after upload_path directive" << std::endl;
+                _validator.addError("Expected ';' after upload_path directive");
                 return location;
             }
             skipToken();
@@ -276,6 +299,7 @@ Location ConfigParser::parseLocationBlock() {
                     token == "listen" || token == "server_name" || token == "error_page" || 
                     token == "client_max_body_size" || token == "location") {
                     std::cerr << "Error: Expected ';' after directive but found directive '" << token << "'" << std::endl;
+                    _validator.addError("Expected ';' after directive but found directive '" + token + "'");
                     return location;
                 }
                 
@@ -284,10 +308,12 @@ Location ConfigParser::parseLocationBlock() {
             
             if (hasNextToken() && getCurrentToken() == "}") {
                 std::cerr << "Error: Expected ';' after directive but found '}'" << std::endl;
+                _validator.addError("Expected ';' after directive but found '}'");
                 return location;
             }
             
             if (!expectToken(";")) {
+                _validator.addError("Expected ';' after cgi_extension directive");
                 return location;
             }
             
@@ -336,6 +362,7 @@ Location ConfigParser::parseLocationBlock() {
                         redirect_value = first_token + " " + url;
                     } else {
                         std::cerr << "Error: Expected URL after return status code" << std::endl;
+                        _validator.addError("Expected URL after return status code");
                         return location;
                     }
                 } else {
@@ -346,9 +373,11 @@ Location ConfigParser::parseLocationBlock() {
                 location.setRedirect(redirect_value);
             } else {
                 std::cerr << "Error: Expected value after 'return'" << std::endl;
+                _validator.addError("Expected value after 'return'");
                 return location;
             }
             if (!expectToken(";")) {
+                _validator.addError("Expected ';' after return directive");
                 return location;
             }
         } else if (directive == ";") {
@@ -383,6 +412,7 @@ ServerConfig ConfigParser::parseServerBlock() {
     // Expect opening brace
     if (!hasNextToken() || getCurrentToken() != "{") {
         std::cerr << "Error: Expected '{' after 'server'" << std::endl;
+        _validator.addError("Expected '{' after 'server'");
         return config;
     }
     skipToken();
@@ -411,7 +441,12 @@ ServerConfig ConfigParser::parseServerBlock() {
                 return config;
             }
         } else if (directive == "server_name") {
-            config.setServerNames(parseStringList());
+            std::vector<std::string> serverNames = parseStringList();
+            // Check for errors after parsing server names
+            if (_validator.hasErrors()) {
+                return config;
+            }
+            config.setServerNames(serverNames);
         } else if (directive == "error_page") {
             if (hasNextToken()) {
                 int error_code = std::atoi(getNextToken().c_str());
@@ -419,14 +454,17 @@ ServerConfig ConfigParser::parseServerBlock() {
                     config.addErrorPage(error_code, getNextToken());
                 } else {
                     std::cerr << "Error: Expected page path after error code" << std::endl;
+                    _validator.addError("Expected page path after error code");
                     return config;
                 }
             } else {
                 std::cerr << "Error: Expected error code after 'error_page'" << std::endl;
+                _validator.addError("Expected error code after 'error_page'");
                 return config;
             }
             if (!hasNextToken() || getCurrentToken() != ";") {
                 std::cerr << "Error: Expected ';' after error_page directive" << std::endl;
+                _validator.addError("Expected ';' after error_page directive");
                 return config;
             }
             skipToken();
@@ -448,15 +486,22 @@ ServerConfig ConfigParser::parseServerBlock() {
                 config.setMaxBodySize(max_body_size);
             } else {
                 std::cerr << "Error: Expected size value after 'client_max_body_size'" << std::endl;
+                _validator.addError("Expected size value after 'client_max_body_size'");
                 return config;
             }
             if (!hasNextToken() || getCurrentToken() != ";") {
                 std::cerr << "Error: Expected ';' after client_max_body_size directive" << std::endl;
+                _validator.addError("Expected ';' after client_max_body_size directive");
                 return config;
             }
             skipToken();
         } else if (directive == "location") {
-            config.addLocation(parseLocationBlock());
+            Location loc = parseLocationBlock();
+            // Check for errors after parsing location block
+            if (_validator.hasErrors()) {
+                return config;
+            }
+            config.addLocation(loc);
         } else if (directive == ";") {
             _validator.validateDirective(directive, "server");
             return config;
@@ -504,11 +549,12 @@ std::vector<ServerConfig> ConfigParser::parse(const std::string& config_file) {
         if (token == "server") {
             ServerConfig config = parseServerBlock();
             
+            // Only add the server if there are no errors
             if (!_validator.hasErrors()) {
                 servers.push_back(config);
             } else {
-                std::cerr << "Error: Failed to parse server block due to syntax errors" << std::endl;
-                // Don't skip - return empty servers list to signal failure
+                std::cerr << "Error: Failed to parse server block due to syntax errors. Server will not start." << std::endl;
+                // Return empty servers list to signal complete failure
                 servers.clear();
                 return servers;
             }

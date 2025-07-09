@@ -6,6 +6,10 @@
 #include "SocketManager.hpp"
 #include <poll.h>
 #include <vector>
+#include <signal.h>
+
+// External global for signal handling
+extern volatile sig_atomic_t g_shutdown_requested;
 
 class WebServer {
 private:
@@ -19,6 +23,7 @@ private:
     void handleNewConnection(int listen_sock);
     void updatePollEvents(int client_sock, short events);
     bool isListenSocket(int fd) const;
+    void cleanup();
     
 public:
     WebServer(const std::vector<ServerConfig>& server_configs);

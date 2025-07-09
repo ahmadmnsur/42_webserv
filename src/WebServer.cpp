@@ -19,9 +19,30 @@ WebServer::WebServer(const std::vector<ServerConfig>& server_configs)
  * Properly closes all listening sockets and cleans up resources
  */
 WebServer::~WebServer() {
+    cleanup();
+}
+
+/*
+ * Performs complete cleanup of all server resources
+ * Closes all sockets and cleans up connections
+ */
+void WebServer::cleanup() {
+    std::cout << "Cleaning up server resources..." << std::endl;
+    
+    // Close all listening sockets
     for (size_t i = 0; i < _listen_sockets.size(); ++i) {
+        std::cout << "Closing listening socket " << _listen_sockets[i] << std::endl;
         _socket_manager.closeSocket(_listen_sockets[i]);
     }
+    _listen_sockets.clear();
+    
+    // Close all client connections through ConnectionHandler destructor
+    // The ConnectionHandler destructor will handle closing client sockets
+    
+    // Clear poll file descriptors
+    _poll_fds.clear();
+    
+    std::cout << "Cleanup complete." << std::endl;
 }
 
 /*
@@ -100,23 +121,35 @@ void WebServer::updatePollEvents(int client_sock, short events) {
     }
 }
 
+/*
+ * Main server loop
+ * Uses poll() to monitor sockets and handles incoming connections and data
+ * Continues until shutdown is requested via signal handler
+ */
 void WebServer::run() {
     std::cout << "Server running with " << _listen_sockets.size() << " listening sockets" << std::endl;
+    std::cout << "Press Ctrl+C to shutdown gracefully..." << std::endl;
     
-    while (true) {
-        int poll_count = poll(&_poll_fds[0], _poll_fds.size(), -1);
+    while (!g_shutdown_requested) {
+        // Use short timeout in poll to check shutdown flag periodically
+        int poll_count = poll(&_poll_fds[0], _poll_fds.size(), 1000); // 1 second timeout
         
         if (poll_count < 0) {
+            if (errno == EINTR) {
+                // Interrupted by signal, check shutdown flag
+                std::cout << "\nSignal received - initiating graceful shutdown..." << std::endl;
+                break;
+            }
             std::cerr << "Poll error: " << strerror(errno) << std::endl;
             break;
         }
         
         if (poll_count == 0) {
-            continue; // Timeout (shouldn't happen with -1)
+            continue; // Timeout, check shutdown flag
         }
         
         // Check all file descriptors
-        for (size_t i = 0; i < _poll_fds.size(); ++i) {
+        for (size_t i = 0; i < _poll_fds.size() && !g_shutdown_requested; ++i) {
             if (_poll_fds[i].revents == 0) {
                 continue;
             }
@@ -160,5 +193,46 @@ void WebServer::run() {
                 }
             }
         }
+    }
+    
+    std::cout << "Server main loop exited. Performing cleanup..." << std::endl;
+}
+
+// ===== Error handling wrapper functions for robustness =====
+
+/* 
+ * Safe memory allocation wrapper
+ * Returns NULL on failure instead of throwing
+ */
+template<typename T>
+T* safe_new(size_t count = 1) {
+    try {
+        return new T[count];
+    } catch (const std::bad_alloc&) {
+        return NULL;
+    }
+}
+
+/*
+ * Safe delete wrapper
+ * Checks for NULL pointer before deletion
+ */
+template<typename T>
+void safe_delete(T*& ptr) {
+    if (ptr) {
+        delete ptr;
+        ptr = NULL;
+    }
+}
+
+/*
+ * Safe array delete wrapper
+ * Checks for NULL pointer before deletion
+ */
+template<typename T>
+void safe_delete_array(T*& ptr) {
+    if (ptr) {
+        delete[] ptr;
+        ptr = NULL;
     }
 }
