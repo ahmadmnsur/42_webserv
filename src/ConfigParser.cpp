@@ -408,6 +408,7 @@ Location ConfigParser::parseLocationBlock() {
  */
 ServerConfig ConfigParser::parseServerBlock() {
     ServerConfig config;
+    bool listen_directive_found = false;
     
     // Expect opening brace
     if (!hasNextToken() || getCurrentToken() != "{") {
@@ -422,6 +423,13 @@ ServerConfig ConfigParser::parseServerBlock() {
         std::string directive = getNextToken();
         
         if (directive == "listen") {
+            // Check for duplicate listen directive
+            if (listen_directive_found) {
+                std::cerr << "Error: Duplicate 'listen' directive found in server block" << std::endl;
+                _validator.addError("Duplicate 'listen' directive found in server block");
+                return config;
+            }
+            listen_directive_found = true;
             if (hasNextToken()) {
                 std::string listen_value = getNextToken();
                 size_t colon_pos = listen_value.find(':');
