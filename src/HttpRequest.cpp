@@ -25,7 +25,8 @@ bool HttpRequest::isValidMethod(const std::string& method) const {
     // Valid HTTP methods - these should return 405 if not allowed for location
     if (method == "GET" || method == "POST" || method == "DELETE" || 
         method == "HEAD" || method == "OPTIONS" || method == "PUT" ||
-        method == "PATCH" || method == "TRACE" || method == "CONNECT") {
+        method == "PATCH" || method == "TRACE" || method == "CONNECT" ||
+        method == "PROPFIND") {
         return true;
     }
     // Invalid methods return 400
@@ -135,6 +136,25 @@ bool HttpRequest::parse(const std::string& raw_request) {
         return false;
     }
     
+    // Check for proper CRLF line endings (strict HTTP compliance)
+    // Look for LF not preceded by CR or double CR
+    for (size_t i = 0; i < raw_request.length(); ++i) {
+        if (raw_request[i] == '\n') {
+            // Check if LF is not preceded by CR
+            if (i == 0 || raw_request[i - 1] != '\r') {
+                _error_code = 400; // Bad Request for improper line endings
+                return false;
+            }
+        }
+        if (raw_request[i] == '\r') {
+            // Check for double CR (like \r\r\n)
+            if (i + 1 < raw_request.length() && raw_request[i + 1] == '\r') {
+                _error_code = 400; // Bad Request for double CR
+                return false;
+            }
+        }
+    }
+    
     std::istringstream stream(raw_request);
     std::string line;
     
@@ -183,6 +203,7 @@ bool HttpRequest::parse(const std::string& raw_request) {
     // Check if request is complete
     size_t content_length = getContentLength();
     if (content_length > 0) {
+        // If Content-Length header is present, we must wait for that amount of body data
         _is_complete = (_body.size() >= content_length);
     } else {
         _is_complete = true;
@@ -206,7 +227,7 @@ bool HttpRequest::parse(const std::string& raw_request) {
     // Validate POST request requirements
     if (!validatePostRequest()) {
         _is_valid = false;
-        return false;
+        return true; // Return true so it's processed as invalid, not incomplete
     }
     
     _is_valid = true;
@@ -291,18 +312,20 @@ bool HttpRequest::isKeepAlive() const {
 }
 
 bool HttpRequest::validatePostRequest() const {
-    // For POST requests, Content-Length is required (RFC 7230 Section 3.3.2)
     if (_method == "POST") {
-        if (!hasHeader("content-length")) {
+        // If POST has a body, Content-Length is required
+        if (!_body.empty() && !hasHeader("content-length")) {
             const_cast<HttpRequest*>(this)->_error_code = 411; // Length Required
             return false;
         }
         
-        // Validate Content-Length matches actual body size
-        size_t declared_length = getContentLength();
-        if (declared_length != _body.size()) {
-            const_cast<HttpRequest*>(this)->_error_code = 400; // Bad Request for Content-Length mismatch
-            return false;
+        // If Content-Length is present, validate it matches actual body size
+        if (hasHeader("content-length")) {
+            size_t declared_length = getContentLength();
+            if (declared_length != _body.size()) {
+                const_cast<HttpRequest*>(this)->_error_code = 400; // Bad Request for Content-Length mismatch
+                return false;
+            }
         }
     }
     return true;

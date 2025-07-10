@@ -161,6 +161,15 @@ HttpResponse HttpResponse::createLengthRequiredResponse() {
     return response;
 }
 
+HttpResponse HttpResponse::createRequestTimeoutResponse() {
+    HttpResponse response;
+    response.setStatusCode(408);
+    response.setContentType("text/html");
+    response.setBody("<html><body><h1>408 Request Timeout</h1><p>The request timed out.</p></body></html>");
+    response.setConnection(false);
+    return response;
+}
+
 void HttpResponse::clear() {
     _status_code = 200;
     _status_message = "OK";

@@ -137,18 +137,36 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
     
     if (request.parse(accumulated_data)) {
         if (request.isValid()) {
-            std::cout << "Valid HTTP request: " << request.getMethod() 
-                      << " " << request.getUri() << " " << request.getVersion() << std::endl;
-            
-            // Process the HTTP request and generate response
-            HttpResponse response = processHttpRequest(request);
-            std::string response_str = response.toString();
-            
-            _clients[client_sock].setWriteBuffer(response_str);
-            _clients[client_sock].setBytesSent(0);
-            
-            // Clear read buffer after successful parsing
-            _clients[client_sock].clearReadBuffer();
+            if (request.isComplete()) {
+                std::cout << "Complete HTTP request: " << request.getMethod() 
+                          << " " << request.getUri() << " " << request.getVersion() << std::endl;
+                
+                // Process the HTTP request and generate response
+                HttpResponse response = processHttpRequest(request);
+                std::string response_str = response.toString();
+                
+                _clients[client_sock].setWriteBuffer(response_str);
+                _clients[client_sock].setBytesSent(0);
+                
+                // Clear read buffer after successful parsing
+                _clients[client_sock].clearReadBuffer();
+            } else {
+                // Valid request but incomplete (waiting for body)
+                std::cout << "Valid but incomplete HTTP request, waiting for body..." << std::endl;
+                
+                // Check for timeout on incomplete requests with headers
+                time_t current_time = time(NULL);
+                time_t connection_time = _clients[client_sock].getConnectionTime();
+                
+                // 3 second timeout for incomplete body
+                if (current_time - connection_time >= 3) {
+                    std::cout << "Request timeout waiting for body from client " << client_sock << std::endl;
+                    HttpResponse response = HttpResponse::createRequestTimeoutResponse();
+                    _clients[client_sock].setWriteBuffer(response.toString());
+                    _clients[client_sock].setBytesSent(0);
+                    _clients[client_sock].clearReadBuffer();
+                }
+            }
         } else {
             std::cout << "Invalid HTTP request from client " << client_sock << std::endl;
             HttpResponse response;
@@ -183,8 +201,24 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
             _clients[client_sock].setBytesSent(0);
             _clients[client_sock].clearReadBuffer();
         } else {
-            // Request not complete yet, wait for more data
+            // Request not complete yet, check for timeout on incomplete requests
             std::cout << "Incomplete HTTP request, waiting for more data..." << std::endl;
+            
+            // Check if this is an incomplete request with Content-Length that's taking too long
+            if (accumulated_data.find("\r\n\r\n") != std::string::npos) {
+                // Headers are complete, check if we're waiting for body
+                time_t current_time = time(NULL);
+                time_t connection_time = _clients[client_sock].getConnectionTime();
+                
+                // 5 second timeout for incomplete body
+                if (current_time - connection_time >= 5) {
+                    std::cout << "Request timeout waiting for body from client " << client_sock << std::endl;
+                    HttpResponse response = HttpResponse::createRequestTimeoutResponse();
+                    _clients[client_sock].setWriteBuffer(response.toString());
+                    _clients[client_sock].setBytesSent(0);
+                    _clients[client_sock].clearReadBuffer();
+                }
+            }
         }
     }
 }

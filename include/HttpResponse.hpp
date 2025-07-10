@@ -43,6 +43,7 @@ public:
     static HttpResponse createBadRequestResponse();
     static HttpResponse createMethodNotAllowedResponse();
     static HttpResponse createLengthRequiredResponse();
+    static HttpResponse createRequestTimeoutResponse();
     
     void clear();
 };
