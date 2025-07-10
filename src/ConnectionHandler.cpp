@@ -9,7 +9,7 @@
  * Default constructor for ConnectionHandler
  * Initializes the connection handler with empty client map
  */
-ConnectionHandler::ConnectionHandler() {}
+ConnectionHandler::ConnectionHandler() : _server_configs(NULL) {}
 
 /*
  * Destructor for ConnectionHandler
@@ -17,6 +17,13 @@ ConnectionHandler::ConnectionHandler() {}
  */
 ConnectionHandler::~ConnectionHandler() {
     closeAllClients();
+}
+
+/*
+ * Sets the server configurations for location matching
+ */
+void ConnectionHandler::setServerConfigs(const std::vector<ServerConfig>& configs) {
+    _server_configs = &configs;
 }
 
 /*
@@ -67,37 +74,121 @@ int ConnectionHandler::acceptNewConnection(int listen_sock) {
 
 /*
  * Processes incoming data from a client
- * Appends data to the client's read buffer and creates HTTP response
- * Currently implements echo functionality for testing
+ * Appends data to the client's read buffer and parses HTTP request
+ * Creates appropriate HTTP response based on request
  */
 void ConnectionHandler::processClientData(int client_sock, const char* buffer, ssize_t bytes_read) {
     _clients[client_sock].appendToReadBuffer(buffer, bytes_read);
     
     std::cout << "Received " << bytes_read << " bytes from client " << client_sock << std::endl;
-    std::cout << "Data: " << std::string(buffer, bytes_read) << std::endl;
     
-    std::string response = createHttpResponse(std::string(buffer, bytes_read));
-    _clients[client_sock].setWriteBuffer(response);
-    _clients[client_sock].setBytesSent(0);
+    // Try to parse HTTP request from accumulated buffer
+    HttpRequest request;
+    std::string accumulated_data = _clients[client_sock].getReadBuffer();
+    
+    if (request.parse(accumulated_data)) {
+        if (request.isValid()) {
+            std::cout << "Valid HTTP request: " << request.getMethod() 
+                      << " " << request.getUri() << " " << request.getVersion() << std::endl;
+            
+            // Process the HTTP request and generate response
+            HttpResponse response = processHttpRequest(request);
+            std::string response_str = response.toString();
+            
+            _clients[client_sock].setWriteBuffer(response_str);
+            _clients[client_sock].setBytesSent(0);
+            
+            // Clear read buffer after successful parsing
+            _clients[client_sock].clearReadBuffer();
+        } else {
+            std::cout << "Invalid HTTP request from client " << client_sock << std::endl;
+            HttpResponse response = HttpResponse::createBadRequestResponse();
+            _clients[client_sock].setWriteBuffer(response.toString());
+            _clients[client_sock].setBytesSent(0);
+            _clients[client_sock].clearReadBuffer();
+        }
+    } else {
+        // Check if this looks like a malformed request rather than incomplete
+        // A complete request has header termination (\r\n\r\n or \n\n)
+        bool has_header_termination = (accumulated_data.find("\r\n\r\n") != std::string::npos ||
+                                      accumulated_data.find("\n\n") != std::string::npos);
+        
+        if (has_header_termination ||
+            (accumulated_data.size() > 0 && accumulated_data.find(' ') == std::string::npos)) {
+            // This appears to be a malformed request, not incomplete
+            std::cout << "Malformed HTTP request from client " << client_sock << std::endl;
+            HttpResponse response = HttpResponse::createBadRequestResponse();
+            _clients[client_sock].setWriteBuffer(response.toString());
+            _clients[client_sock].setBytesSent(0);
+            _clients[client_sock].clearReadBuffer();
+        } else {
+            // Request not complete yet, wait for more data
+            std::cout << "Incomplete HTTP request, waiting for more data..." << std::endl;
+        }
+    }
 }
 
 /*
- * Creates a basic HTTP response with the given content
- * Includes proper HTTP headers and content length
- * Returns a complete HTTP response string
+ * Processes an HTTP request and generates an appropriate response
+ * Handles different HTTP methods and creates proper responses
+ * Returns HttpResponse object with proper status codes and headers
  */
-std::string ConnectionHandler::createHttpResponse(const std::string& content) {
-    std::string response = "HTTP/1.1 200 OK\r\n";
-    response += "Content-Type: text/plain\r\n";
+HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
+    std::string method = request.getMethod();
+    std::string uri = request.getUri();
     
-    std::stringstream ss;
-    ss << content.size();
-    response += "Content-Length: " + ss.str() + "\r\n";
-    response += "Connection: close\r\n";
-    response += "\r\n";
-    response += content;
+    // Sanitize path to prevent directory traversal attacks
+    std::string sanitized_uri = sanitizePath(uri);
+    if (sanitized_uri.empty()) {
+        return HttpResponse::createNotFoundResponse();  // Dangerous path detected - return 404 for security
+    }
     
-    return response;
+    // Find matching location
+    const Location* location = findMatchingLocation(sanitized_uri);
+    if (!location) {
+        return HttpResponse::createNotFoundResponse();
+    }
+    
+    // Check if method is allowed for this location
+    const std::vector<std::string>& allowed_methods = location->getMethods();
+    bool method_allowed = false;
+    for (size_t i = 0; i < allowed_methods.size(); ++i) {
+        if (allowed_methods[i] == method) {
+            method_allowed = true;
+            break;
+        }
+    }
+    
+    if (!method_allowed) {
+        return HttpResponse::createMethodNotAllowedResponse();
+    }
+    
+    // Handle GET requests with proper file serving logic
+    if (method == "GET") {
+        if (sanitized_uri == "/") {
+            // Return a welcome page for root
+            std::string body = "<html><body><h1>Welcome to WebServ</h1><p>HTTP/1.1 Server</p></body></html>";
+            return HttpResponse::createOkResponse(body, "text/html");
+        } else {
+            // For other paths, determine MIME type and return appropriate response
+            std::string detected_mime = getMimeType(sanitized_uri);
+            std::string body = "<html><body><h1>Path Found: " + sanitized_uri + "</h1>";
+            body += "<p>Location: " + location->getPath() + "</p>";
+            body += "<p>Root: " + location->getRoot() + "</p>";
+            body += "<p>Detected MIME Type: " + detected_mime + "</p>";
+            body += "</body></html>";
+            // Return HTML content with correct content-type
+            return HttpResponse::createOkResponse(body, "text/html");
+        }
+    } else if (method == "POST") {
+        std::string body = "POST request received\nURI: " + sanitized_uri + "\nBody: " + request.getBody();
+        return HttpResponse::createOkResponse(body, "text/plain");
+    } else if (method == "DELETE") {
+        std::string body = "DELETE request received\nURI: " + sanitized_uri;
+        return HttpResponse::createOkResponse(body, "text/plain");
+    }
+    
+    return HttpResponse::createServerErrorResponse();
 }
 
 /*
@@ -193,4 +284,130 @@ ClientData& ConnectionHandler::getClient(int client_sock) {
 const ClientData& ConnectionHandler::getClient(int client_sock) const {
     std::map<int, ClientData>::const_iterator it = _clients.find(client_sock);
     return it->second;
+}
+
+/*
+ * Finds the best matching location for the given URI
+ * Returns pointer to matching Location or NULL if no match found
+ */
+const Location* ConnectionHandler::findMatchingLocation(const std::string& uri) const {
+    if (!_server_configs || _server_configs->empty()) {
+        return NULL;
+    }
+    
+    // For now, use the first server config (can be enhanced for virtual hosts)
+    const ServerConfig& config = (*_server_configs)[0];
+    const std::vector<Location>& locations = config.getLocations();
+    
+    const Location* best_match = NULL;
+    size_t best_match_length = 0;
+    
+    // Find the longest matching location path
+    for (size_t i = 0; i < locations.size(); ++i) {
+        const Location& location = locations[i];
+        const std::string& location_path = location.getPath();
+        
+        // Check if URI matches location path
+        if (location_path == "/") {
+            // Root location only matches exactly "/"
+            if (uri == "/") {
+                if (location_path.length() > best_match_length) {
+                    best_match = &location;
+                    best_match_length = location_path.length();
+                }
+            }
+        } else if (uri.find(location_path) == 0) {
+            // Non-root locations: exact match or followed by '/'
+            if (uri.length() == location_path.length() || 
+                (uri.length() > location_path.length() && uri[location_path.length()] == '/')) {
+                
+                // Keep the longest match (most specific)
+                if (location_path.length() > best_match_length) {
+                    best_match = &location;
+                    best_match_length = location_path.length();
+                }
+            }
+        }
+    }
+    
+    return best_match;
+}
+
+/*
+ * Sanitizes and validates path to prevent directory traversal attacks
+ * Returns the sanitized path or empty string if path is dangerous
+ */
+std::string ConnectionHandler::sanitizePath(const std::string& path) const {
+    if (path.empty()) {
+        return "";
+    }
+    
+    // Check for obvious path traversal attempts
+    if (path.find("../") != std::string::npos || path.find("..\\") != std::string::npos) {
+        return "";  // Reject paths with parent directory references
+    }
+    
+    // Check for other dangerous patterns
+    if (path.find("//") != std::string::npos || path.find("\\") != std::string::npos) {
+        return "";  // Reject paths with double slashes or backslashes
+    }
+    
+    // Path must start with /
+    if (path[0] != '/') {
+        return "";
+    }
+    
+    // Additional security: reject paths with null bytes or control characters
+    for (size_t i = 0; i < path.length(); ++i) {
+        char c = path[i];
+        if (c < 32 && c != '\t') {  // Allow tab but reject other control chars
+            return "";
+        }
+    }
+    
+    return path;  // Path is safe
+}
+
+/*
+ * Determines MIME type based on file extension
+ * Returns the appropriate MIME type string
+ */
+std::string ConnectionHandler::getMimeType(const std::string& path) const {
+    // Find the last dot to get file extension
+    size_t dot_pos = path.find_last_of('.');
+    if (dot_pos == std::string::npos) {
+        return "text/plain";  // Default for files without extension
+    }
+    
+    std::string extension = path.substr(dot_pos);
+    
+    // Convert to lowercase for comparison
+    for (size_t i = 0; i < extension.length(); ++i) {
+        if (extension[i] >= 'A' && extension[i] <= 'Z') {
+            extension[i] = extension[i] + 32;  // Convert to lowercase
+        }
+    }
+    
+    // Basic MIME type mapping
+    if (extension == ".html" || extension == ".htm") {
+        return "text/html";
+    } else if (extension == ".css") {
+        return "text/css";
+    } else if (extension == ".js") {
+        return "application/javascript";
+    } else if (extension == ".png") {
+        return "image/png";
+    } else if (extension == ".jpg" || extension == ".jpeg") {
+        return "image/jpeg";
+    } else if (extension == ".gif") {
+        return "image/gif";
+    } else if (extension == ".txt") {
+        return "text/plain";
+    } else if (extension == ".json") {
+        return "application/json";
+    } else if (extension == ".xml") {
+        return "application/xml";
+    } else {
+        return "application/octet-stream";  // Default for unknown types
+    }
 }

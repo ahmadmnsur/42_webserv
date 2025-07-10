@@ -1,0 +1,48 @@
+#ifndef HTTPREQUEST_HPP
+#define HTTPREQUEST_HPP
+
+#include <string>
+#include <map>
+#include <vector>
+
+class HttpRequest {
+private:
+    std::string _method;
+    std::string _uri;
+    std::string _version;
+    std::map<std::string, std::string> _headers;
+    std::string _body;
+    bool _is_complete;
+    bool _is_valid;
+    
+    std::string toLowerCase(const std::string& str) const;
+    std::string trim(const std::string& str) const;
+    bool parseRequestLine(const std::string& line);
+    bool parseHeader(const std::string& line);
+    bool isValidMethod(const std::string& method) const;
+    bool isValidVersion(const std::string& version) const;
+
+public:
+    HttpRequest();
+    ~HttpRequest();
+    
+    bool parse(const std::string& raw_request);
+    void clear();
+    
+    // Getters
+    const std::string& getMethod() const;
+    const std::string& getUri() const;
+    const std::string& getVersion() const;
+    const std::map<std::string, std::string>& getHeaders() const;
+    const std::string& getBody() const;
+    bool isComplete() const;
+    bool isValid() const;
+    
+    // Header utilities
+    std::string getHeader(const std::string& name) const;
+    bool hasHeader(const std::string& name) const;
+    size_t getContentLength() const;
+    bool isKeepAlive() const;
+};
+
+#endif

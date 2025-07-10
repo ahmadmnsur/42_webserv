@@ -3,6 +3,9 @@
 
 #include "ClientData.hpp"
 #include "SocketManager.hpp"
+#include "HttpRequest.hpp"
+#include "HttpResponse.hpp"
+#include "ServerConfig.hpp"
 #include <map>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -12,13 +15,19 @@ class ConnectionHandler {
 private:
     std::map<int, ClientData> _clients;
     SocketManager _socket_manager;
+    const std::vector<ServerConfig>* _server_configs;
     
-    std::string createHttpResponse(const std::string& content);
+    HttpResponse processHttpRequest(const HttpRequest& request);
     void processClientData(int client_sock, const char* buffer, ssize_t bytes_read);
+    const Location* findMatchingLocation(const std::string& uri) const;
+    std::string sanitizePath(const std::string& path) const;
+    std::string getMimeType(const std::string& path) const;
 
 public:
     ConnectionHandler();
     ~ConnectionHandler();
+    
+    void setServerConfigs(const std::vector<ServerConfig>& configs);
     
     int acceptNewConnection(int listen_sock);
     void handleClientRead(int client_sock);

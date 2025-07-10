@@ -10,6 +10,7 @@
  */
 WebServer::WebServer(const std::vector<ServerConfig>& server_configs, const SignalManager& signal_manager) 
     : _configs(server_configs), _signal_manager(signal_manager) {
+    _connection_handler.setServerConfigs(_configs);
     setupSockets();
 }
 
