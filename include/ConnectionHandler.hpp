@@ -34,6 +34,7 @@ public:
     void handleClientWrite(int client_sock);
     void removeClient(int client_sock);
     void closeAllClients(); // New method for cleanup
+    std::vector<int> checkEmptyRequestTimeouts(); // Check for clients with empty request timeouts, returns clients needing POLLOUT
     
     bool hasClient(int client_sock) const;
     ClientData& getClient(int client_sock);

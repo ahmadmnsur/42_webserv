@@ -121,7 +121,18 @@ void WebServer::run() {
         }
         
         if (poll_count == 0) {
-            continue; // Timeout, check shutdown flag
+            // Timeout, check for empty request timeouts
+            std::vector<int> clients_needing_pollout = _connection_handler.checkEmptyRequestTimeouts();
+            for (size_t i = 0; i < clients_needing_pollout.size(); ++i) {
+                updatePollEvents(clients_needing_pollout[i], POLLIN | POLLOUT);
+            }
+            continue; // Check shutdown flag
+        }
+        
+        // Always check for empty request timeouts on each iteration
+        std::vector<int> clients_needing_pollout = _connection_handler.checkEmptyRequestTimeouts();
+        for (size_t i = 0; i < clients_needing_pollout.size(); ++i) {
+            updatePollEvents(clients_needing_pollout[i], POLLIN | POLLOUT);
         }
         
         // Check all file descriptors

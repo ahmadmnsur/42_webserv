@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
+#include <ctime>
+#include <map>
 
 /*
  * Default constructor for ConnectionHandler
@@ -37,6 +39,43 @@ void ConnectionHandler::closeAllClients() {
         _socket_manager.closeSocket(it->first);
     }
     _clients.clear();
+}
+
+/*
+ * Checks for clients with empty request timeouts
+ * Called periodically to handle clients that connect but don't send data
+ * Returns list of clients that need POLLOUT events
+ */
+std::vector<int> ConnectionHandler::checkEmptyRequestTimeouts() {
+    time_t current_time = time(NULL);
+    std::vector<int> clients_needing_pollout;
+    
+    for (std::map<int, ClientData>::iterator it = _clients.begin(); 
+         it != _clients.end(); ++it) {
+        int client_sock = it->first;
+        ClientData& client = it->second;
+        
+        // Check if client has been connected without sending data for too long
+        if (client.getReadBuffer().empty() && client.getWriteBuffer().empty()) {
+            time_t connection_time = client.getConnectionTime();
+            time_t elapsed = current_time - connection_time;
+            
+            
+            // 1 second timeout for empty requests (quick response)
+            if (elapsed >= 1) {
+                std::cout << "Empty request timeout from client " << client_sock << std::endl;
+                
+                HttpResponse response = HttpResponse::createBadRequestResponse();
+                client.setWriteBuffer(response.toString());
+                client.setBytesSent(0);
+                
+                // This client now needs POLLOUT events to send the response
+                clients_needing_pollout.push_back(client_sock);
+            }
+        }
+    }
+    
+    return clients_needing_pollout;
 }
 
 /*
@@ -86,6 +125,16 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
     HttpRequest request;
     std::string accumulated_data = _clients[client_sock].getReadBuffer();
     
+    // Special handling for empty request (when client sends nothing and closes connection)
+    if (bytes_read == 0 && accumulated_data.empty()) {
+        std::cout << "Empty request from client " << client_sock << std::endl;
+        HttpResponse response = HttpResponse::createBadRequestResponse();
+        _clients[client_sock].setWriteBuffer(response.toString());
+        _clients[client_sock].setBytesSent(0);
+        _clients[client_sock].clearReadBuffer();
+        return;
+    }
+    
     if (request.parse(accumulated_data)) {
         if (request.isValid()) {
             std::cout << "Valid HTTP request: " << request.getMethod() 
@@ -102,7 +151,16 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
             _clients[client_sock].clearReadBuffer();
         } else {
             std::cout << "Invalid HTTP request from client " << client_sock << std::endl;
-            HttpResponse response = HttpResponse::createBadRequestResponse();
+            HttpResponse response;
+            
+            // Use specific error code from request parsing
+            int error_code = request.getErrorCode();
+            if (error_code == 411) {
+                response = HttpResponse::createLengthRequiredResponse();
+            } else {
+                response = HttpResponse::createBadRequestResponse();
+            }
+            
             _clients[client_sock].setWriteBuffer(response.toString());
             _clients[client_sock].setBytesSent(0);
             _clients[client_sock].clearReadBuffer();
@@ -113,10 +171,13 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
         bool has_header_termination = (accumulated_data.find("\r\n\r\n") != std::string::npos ||
                                       accumulated_data.find("\n\n") != std::string::npos);
         
-        if (has_header_termination ||
-            (accumulated_data.size() > 0 && accumulated_data.find(' ') == std::string::npos)) {
-            // This appears to be a malformed request, not incomplete
-            std::cout << "Malformed HTTP request from client " << client_sock << std::endl;
+        // Check for empty request or malformed request
+        bool is_empty_request = (accumulated_data.empty());
+        bool is_malformed = (accumulated_data.size() > 0 && accumulated_data.find(' ') == std::string::npos);
+        
+        if (has_header_termination || is_empty_request || is_malformed) {
+            // This appears to be a malformed or empty request, not incomplete
+            std::cout << "Malformed or empty HTTP request from client " << client_sock << std::endl;
             HttpResponse response = HttpResponse::createBadRequestResponse();
             _clients[client_sock].setWriteBuffer(response.toString());
             _clients[client_sock].setBytesSent(0);
@@ -204,6 +265,13 @@ void ConnectionHandler::handleClientRead(int client_sock) {
         buffer[bytes_read] = '\0';
         processClientData(client_sock, buffer, bytes_read);
     } else if (bytes_read == 0) {
+        // Client closed connection - check if we have any data to process
+        std::string accumulated_data = _clients[client_sock].getReadBuffer();
+        if (accumulated_data.empty()) {
+            // Empty request - process as empty request
+            processClientData(client_sock, "", 0);
+            return; // Don't remove client yet, let it send the response
+        }
         std::cout << "Client " << client_sock << " disconnected" << std::endl;
         removeClient(client_sock);
     } else {

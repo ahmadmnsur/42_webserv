@@ -14,6 +14,7 @@ private:
     std::string _body;
     bool _is_complete;
     bool _is_valid;
+    int _error_code; // 0 = no error, 400 = bad request, 405 = method not allowed, 411 = length required
     
     std::string toLowerCase(const std::string& str) const;
     std::string trim(const std::string& str) const;
@@ -21,6 +22,7 @@ private:
     bool parseHeader(const std::string& line);
     bool isValidMethod(const std::string& method) const;
     bool isValidVersion(const std::string& version) const;
+    bool validatePostRequest() const;
 
 public:
     HttpRequest();
@@ -43,6 +45,7 @@ public:
     bool hasHeader(const std::string& name) const;
     size_t getContentLength() const;
     bool isKeepAlive() const;
+    int getErrorCode() const;
 };
 
 #endif

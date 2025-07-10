@@ -1,10 +1,11 @@
 #include "ClientData.hpp"
+#include <ctime>
 
 /*
  * Default constructor for ClientData
  * Initializes with empty buffers and zero bytes sent
  */
-ClientData::ClientData() : _bytes_sent(0) {}
+ClientData::ClientData() : _bytes_sent(0), _connection_time(time(NULL)) {}
 
 /*
  * Destructor for ClientData
@@ -35,6 +36,14 @@ const std::string& ClientData::getWriteBuffer() const {
  */
 size_t ClientData::getBytesSent() const {
     return _bytes_sent;
+}
+
+/*
+ * Returns the connection time when the client connected
+ * Used for timeout handling
+ */
+time_t ClientData::getConnectionTime() const {
+    return _connection_time;
 }
 
 // Setters

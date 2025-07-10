@@ -19,6 +19,8 @@ std::string HttpResponse::getStatusMessage(int status_code) const {
         case 403: return "Forbidden";
         case 404: return "Not Found";
         case 405: return "Method Not Allowed";
+        case 408: return "Request Timeout";
+        case 411: return "Length Required";
         case 413: return "Payload Too Large";
         case 500: return "Internal Server Error";
         case 501: return "Not Implemented";
@@ -146,6 +148,15 @@ HttpResponse HttpResponse::createMethodNotAllowedResponse() {
     response.setStatusCode(405);
     response.setContentType("text/html");
     response.setBody("<html><body><h1>405 Method Not Allowed</h1><p>The requested method is not allowed.</p></body></html>");
+    response.setConnection(false);
+    return response;
+}
+
+HttpResponse HttpResponse::createLengthRequiredResponse() {
+    HttpResponse response;
+    response.setStatusCode(411);
+    response.setContentType("text/html");
+    response.setBody("<html><body><h1>411 Length Required</h1><p>Content-Length header is required for this request.</p></body></html>");
     response.setConnection(false);
     return response;
 }
