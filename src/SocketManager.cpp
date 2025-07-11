@@ -61,7 +61,7 @@ bool SocketManager::setSocketOptions(int sock_fd) {
  * Returns true if successful, false otherwise
  */
 bool SocketManager::setNonBlocking(int sock_fd) {
-    int flags = fcntl(sock_fd, F_GETFL, 0);
+    int flags = fcntl(sock_fd, F_SETFL, O_NONBLOCK);
     if (flags < 0 || fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
         std::cerr << "Error setting non-blocking: " << strerror(errno) << std::endl;
         return false;
