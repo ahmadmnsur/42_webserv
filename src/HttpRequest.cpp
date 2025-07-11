@@ -56,6 +56,15 @@ bool HttpRequest::parseRequestLine(const std::string& line) {
         return false;
     }
     
+    // Check for control characters in the raw request line before parsing
+    for (size_t i = 0; i < line.length(); ++i) {
+        char c = line[i];
+        if (c < 32 && c != ' ') { // Control characters except space
+            _error_code = 400; // Bad Request for control characters in request line
+            return false;
+        }
+    }
+    
     // Trim the line
     std::string trimmed_line = trim(line);
     
@@ -81,10 +90,19 @@ bool HttpRequest::parseRequestLine(const std::string& line) {
         return false;
     }
     
-    // Check for null bytes in URI (security check)
+    // Check for null bytes and control characters in URI (security check)
     if (uri.find('\0') != std::string::npos) {
         _error_code = 400; // Bad Request for null bytes in URI
         return false;
+    }
+    
+    // Check for control characters in URI (CR, LF, TAB, etc.)
+    for (size_t i = 0; i < uri.length(); ++i) {
+        char c = uri[i];
+        if (c < 32 || c == 127) { // Control characters (0-31 and 127)
+            _error_code = 400; // Bad Request for control characters in URI
+            return false;
+        }
     }
     
     // Validate method
@@ -205,6 +223,12 @@ bool HttpRequest::parse(const std::string& raw_request) {
     if (content_length > 0) {
         // If Content-Length header is present, we must wait for that amount of body data
         _is_complete = (_body.size() >= content_length);
+        
+        // Let incomplete requests be handled by timeout logic in connection handler
+    } else if (_method == "POST" || _method == "PUT" || _method == "PATCH") {
+        // For methods that typically have bodies, if no Content-Length is specified, 
+        // the request is incomplete unless explicitly stated otherwise
+        _is_complete = true; // Will be caught by validatePostRequest() if needed
     } else {
         _is_complete = true;
     }

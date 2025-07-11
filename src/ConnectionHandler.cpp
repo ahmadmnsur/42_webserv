@@ -55,12 +55,11 @@ std::vector<int> ConnectionHandler::checkEmptyRequestTimeouts() {
         int client_sock = it->first;
         ClientData& client = it->second;
         
+        time_t connection_time = client.getConnectionTime();
+        time_t elapsed = current_time - connection_time;
+        
         // Check if client has been connected without sending data for too long
         if (client.getReadBuffer().empty() && client.getWriteBuffer().empty()) {
-            time_t connection_time = client.getConnectionTime();
-            time_t elapsed = current_time - connection_time;
-            
-            
             // 1 second timeout for empty requests (quick response)
             if (elapsed >= 1) {
                 std::cout << "Empty request timeout from client " << client_sock << std::endl;
@@ -71,6 +70,31 @@ std::vector<int> ConnectionHandler::checkEmptyRequestTimeouts() {
                 
                 // This client now needs POLLOUT events to send the response
                 clients_needing_pollout.push_back(client_sock);
+            }
+        } else if (!client.getReadBuffer().empty() && client.getWriteBuffer().empty()) {
+            // Check for incomplete requests (have data but no response ready)
+            // Try to parse the accumulated data to see if it's an incomplete request
+            HttpRequest request;
+            std::string accumulated_data = client.getReadBuffer();
+            
+            if (request.parse(accumulated_data)) {
+                if (request.isValid() && !request.isComplete()) {
+                    // This is a valid but incomplete request - check for timeout
+                    std::cout << "Found incomplete request from client " << client_sock 
+                              << " (elapsed: " << elapsed << "s)" << std::endl;
+                    
+                    // 3 second timeout for incomplete body
+                    if (elapsed >= 3) {
+                        std::cout << "Incomplete request timeout from client " << client_sock << std::endl;
+                        
+                        HttpResponse response = HttpResponse::createRequestTimeoutResponse();
+                        client.setWriteBuffer(response.toString());
+                        client.setBytesSent(0);
+                        
+                        // This client now needs POLLOUT events to send the response
+                        clients_needing_pollout.push_back(client_sock);
+                    }
+                }
             }
         }
     }
@@ -153,19 +177,17 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
             } else {
                 // Valid request but incomplete (waiting for body)
                 std::cout << "Valid but incomplete HTTP request, waiting for body..." << std::endl;
-                
-                // Check for timeout on incomplete requests with headers
+                // Check for immediate timeout for testing purposes
                 time_t current_time = time(NULL);
                 time_t connection_time = _clients[client_sock].getConnectionTime();
-                
-                // 3 second timeout for incomplete body
                 if (current_time - connection_time >= 3) {
-                    std::cout << "Request timeout waiting for body from client " << client_sock << std::endl;
+                    std::cout << "Incomplete request immediate timeout from client " << client_sock << std::endl;
                     HttpResponse response = HttpResponse::createRequestTimeoutResponse();
                     _clients[client_sock].setWriteBuffer(response.toString());
                     _clients[client_sock].setBytesSent(0);
                     _clients[client_sock].clearReadBuffer();
                 }
+                // Timeout handling is also done in checkEmptyRequestTimeouts()
             }
         } else {
             std::cout << "Invalid HTTP request from client " << client_sock << std::endl;
@@ -204,21 +226,7 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
             // Request not complete yet, check for timeout on incomplete requests
             std::cout << "Incomplete HTTP request, waiting for more data..." << std::endl;
             
-            // Check if this is an incomplete request with Content-Length that's taking too long
-            if (accumulated_data.find("\r\n\r\n") != std::string::npos) {
-                // Headers are complete, check if we're waiting for body
-                time_t current_time = time(NULL);
-                time_t connection_time = _clients[client_sock].getConnectionTime();
-                
-                // 5 second timeout for incomplete body
-                if (current_time - connection_time >= 5) {
-                    std::cout << "Request timeout waiting for body from client " << client_sock << std::endl;
-                    HttpResponse response = HttpResponse::createRequestTimeoutResponse();
-                    _clients[client_sock].setWriteBuffer(response.toString());
-                    _clients[client_sock].setBytesSent(0);
-                    _clients[client_sock].clearReadBuffer();
-                }
-            }
+            // Timeout handling for incomplete requests is now done in checkEmptyRequestTimeouts()
         }
     }
 }
