@@ -154,24 +154,8 @@ bool HttpRequest::parse(const std::string& raw_request) {
         return false;
     }
     
-    // Check for proper CRLF line endings (strict HTTP compliance)
-    // Look for LF not preceded by CR or double CR
-    for (size_t i = 0; i < raw_request.length(); ++i) {
-        if (raw_request[i] == '\n') {
-            // Check if LF is not preceded by CR
-            if (i == 0 || raw_request[i - 1] != '\r') {
-                _error_code = 400; // Bad Request for improper line endings
-                return false;
-            }
-        }
-        if (raw_request[i] == '\r') {
-            // Check for double CR (like \r\r\n)
-            if (i + 1 < raw_request.length() && raw_request[i + 1] == '\r') {
-                _error_code = 400; // Bad Request for double CR
-                return false;
-            }
-        }
-    }
+    // Skip line ending validation - be maximally tolerant
+    // This allows fragmented requests from various HTTP clients
     
     std::istringstream stream(raw_request);
     std::string line;
@@ -209,7 +193,23 @@ bool HttpRequest::parse(const std::string& raw_request) {
     // Read body if present
     std::ostringstream body_stream;
     std::string body_line;
+    bool has_content = false;
+    
     while (std::getline(stream, body_line)) {
+        // Remove carriage return if present
+        if (!body_line.empty() && body_line[body_line.size() - 1] == '\r') {
+            body_line.erase(body_line.size() - 1);
+        }
+        
+        // Skip empty lines at the beginning, but preserve them if we already have content
+        if (body_line.empty() && !has_content) {
+            continue;
+        }
+        
+        if (!body_line.empty()) {
+            has_content = true;
+        }
+        
         body_stream << body_line << "\n";
     }
     

@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <sstream>
+#include <vector>
 
 class HttpResponse {
 private:
@@ -12,6 +13,7 @@ private:
     std::string _version;
     std::map<std::string, std::string> _headers;
     std::string _body;
+    bool _is_head_response;
     
     std::string getStatusMessage(int status_code) const;
 
@@ -38,12 +40,16 @@ public:
     
     // Static factory methods for common responses
     static HttpResponse createOkResponse(const std::string& body, const std::string& content_type = "text/plain");
+    static HttpResponse createHeadResponse(const std::string& content_type = "text/plain", size_t content_length = 0);
     static HttpResponse createNotFoundResponse();
+    static HttpResponse createForbiddenResponse();
     static HttpResponse createServerErrorResponse();
     static HttpResponse createBadRequestResponse();
     static HttpResponse createMethodNotAllowedResponse();
+    static HttpResponse createMethodNotAllowedResponse(const std::vector<std::string>& allowed_methods);
     static HttpResponse createLengthRequiredResponse();
     static HttpResponse createRequestTimeoutResponse();
+    static HttpResponse createRequestEntityTooLargeResponse();
     
     void clear();
 };

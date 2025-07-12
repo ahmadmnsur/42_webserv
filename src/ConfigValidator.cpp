@@ -40,7 +40,7 @@ bool ConfigValidator::isKnownDirective(const std::string& directive) const {
  * Returns true if method is valid, false otherwise
  */
 bool ConfigValidator::validateHttpMethod(const std::string& method) {
-    if (method != "GET" && method != "POST" && method != "DELETE") {
+    if (method != "GET" && method != "POST" && method != "DELETE" && method != "PUT") {
         reportError("Invalid HTTP method '" + method + "'. Valid methods are: GET, POST, DELETE");
         return false;
     }

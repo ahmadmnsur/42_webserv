@@ -356,10 +356,10 @@ Location ConfigParser::parseLocationBlock() {
                 std::string extension = tokens[i];
                 std::string path = tokens[i + 1];
                 
-                // Validate that only .py and .php extensions are supported
-                if (extension != ".py" && extension != ".php") {
-                    std::cerr << "Error: Unsupported CGI extension '" << extension << "'. Only .py and .php are supported." << std::endl;
-                    _validator.addError("Unsupported CGI extension '" + extension + "'. Only .py and .php are supported.");
+                // Validate that only .py, .php, and .bla extensions are supported
+                if (extension != ".py" && extension != ".php" && extension != ".bla") {
+                    std::cerr << "Error: Unsupported CGI extension '" << extension << "'. Only .py, .php, and .bla are supported." << std::endl;
+                    _validator.addError("Unsupported CGI extension '" + extension + "'. Only .py, .php, and .bla are supported.");
                     return location;
                 }
                 

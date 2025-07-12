@@ -1,7 +1,8 @@
 #include "HttpResponse.hpp"
 #include <sstream>
+#include <iostream>
 
-HttpResponse::HttpResponse() : _status_code(200), _version("HTTP/1.1") {
+HttpResponse::HttpResponse() : _status_code(200), _version("HTTP/1.1"), _is_head_response(false) {
     _status_message = getStatusMessage(_status_code);
 }
 
@@ -101,8 +102,10 @@ std::string HttpResponse::toString() const {
     // Empty line to separate headers from body
     response << "\r\n";
     
-    // Body
-    response << _body;
+    // Body (only for non-HEAD responses)
+    if (!_is_head_response) {
+        response << _body;
+    }
     
     return response.str();
 }
@@ -116,11 +119,32 @@ HttpResponse HttpResponse::createOkResponse(const std::string& body, const std::
     return response;
 }
 
+HttpResponse HttpResponse::createHeadResponse(const std::string& content_type, size_t content_length) {
+    (void)content_length;  // Silence unused parameter warning
+    HttpResponse response;
+    response.setStatusCode(200);
+    response.setContentType(content_type);
+    response.setContentLength(0);  // Set Content-Length to 0 since no body is sent
+    response.setConnection(false);
+    response._is_head_response = true;
+    // No body for HEAD responses
+    return response;
+}
+
 HttpResponse HttpResponse::createNotFoundResponse() {
     HttpResponse response;
     response.setStatusCode(404);
     response.setContentType("text/html");
     response.setBody("<html><body><h1>404 Not Found</h1><p>The requested resource was not found.</p></body></html>");
+    response.setConnection(false);
+    return response;
+}
+
+HttpResponse HttpResponse::createForbiddenResponse() {
+    HttpResponse response;
+    response.setStatusCode(403);
+    response.setContentType("text/html");
+    response.setBody("<html><body><h1>403 Forbidden</h1><p>Access to this resource is forbidden.</p></body></html>");
     response.setConnection(false);
     return response;
 }
@@ -147,6 +171,36 @@ HttpResponse HttpResponse::createMethodNotAllowedResponse() {
     HttpResponse response;
     response.setStatusCode(405);
     response.setContentType("text/html");
+    response.setHeader("Allow", "GET");
+    response.setBody("<html><body><h1>405 Method Not Allowed</h1><p>The requested method is not allowed.</p></body></html>");
+    response.setConnection(false);
+    return response;
+}
+
+HttpResponse HttpResponse::createMethodNotAllowedResponse(const std::vector<std::string>& allowed_methods) {
+    HttpResponse response;
+    response.setStatusCode(405);
+    response.setContentType("text/html");
+    
+    // Build Allow header from allowed methods, automatically include HEAD if GET is allowed
+    std::string allow_header;
+    for (size_t i = 0; i < allowed_methods.size(); ++i) {
+        if (i > 0) allow_header += ", ";
+        allow_header += allowed_methods[i];
+    }
+    
+    // Add HEAD if GET is allowed but HEAD is not explicitly listed
+    bool has_get = false, has_head = false;
+    for (size_t i = 0; i < allowed_methods.size(); ++i) {
+        if (allowed_methods[i] == "GET") has_get = true;
+        if (allowed_methods[i] == "HEAD") has_head = true;
+    }
+    if (has_get && !has_head) {
+        if (!allow_header.empty()) allow_header += ", ";
+        allow_header += "HEAD";
+    }
+    
+    response.setHeader("Allow", allow_header);
     response.setBody("<html><body><h1>405 Method Not Allowed</h1><p>The requested method is not allowed.</p></body></html>");
     response.setConnection(false);
     return response;
@@ -170,10 +224,20 @@ HttpResponse HttpResponse::createRequestTimeoutResponse() {
     return response;
 }
 
+HttpResponse HttpResponse::createRequestEntityTooLargeResponse() {
+    HttpResponse response;
+    response.setStatusCode(413);
+    response.setContentType("text/html");
+    response.setBody("<html><body><h1>413 Payload Too Large</h1><p>The request payload is too large.</p></body></html>");
+    response.setConnection(false);
+    return response;
+}
+
 void HttpResponse::clear() {
     _status_code = 200;
     _status_message = "OK";
     _version = "HTTP/1.1";
     _headers.clear();
     _body.clear();
+    _is_head_response = false;
 }

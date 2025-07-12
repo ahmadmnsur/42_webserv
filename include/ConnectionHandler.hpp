@@ -22,6 +22,9 @@ private:
     const Location* findMatchingLocation(const std::string& uri) const;
     std::string sanitizePath(const std::string& path) const;
     std::string getMimeType(const std::string& path) const;
+    const ServerConfig* getCurrentServerConfig() const;
+    HttpResponse executeCgiScript(const std::string& script_path, const std::string& interpreter_path, 
+                                  const HttpRequest& request, const std::string& file_path) const;
 
 public:
     ConnectionHandler();
@@ -34,7 +37,7 @@ public:
     void handleClientWrite(int client_sock);
     void removeClient(int client_sock);
     void closeAllClients(); // New method for cleanup
-    std::vector<int> checkEmptyRequestTimeouts(); // Check for clients with empty request timeouts, returns clients needing POLLOUT
+    std::vector<int> checkEmptyRequestTimeouts(); // Check for clients with empty/incomplete request timeouts, returns clients needing POLLOUT
     
     bool hasClient(int client_sock) const;
     ClientData& getClient(int client_sock);
