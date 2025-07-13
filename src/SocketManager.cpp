@@ -49,7 +49,7 @@ bool SocketManager::parseIPAddress(const std::string& host, struct sockaddr_in& 
 bool SocketManager::setSocketOptions(int sock_fd) {
     int opt = 1;
     if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        std::cerr << "Error setting SO_REUSEADDR: " << strerror(errno) << std::endl;
+        std::cerr << "Error setting SO_REUSEADDR" << std::endl;
         return false;
     }
     return true;
@@ -63,7 +63,7 @@ bool SocketManager::setSocketOptions(int sock_fd) {
 bool SocketManager::setNonBlocking(int sock_fd) {
     int flags = fcntl(sock_fd, F_SETFL, O_NONBLOCK);
     if (flags < 0 || fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-        std::cerr << "Error setting non-blocking: " << strerror(errno) << std::endl;
+        std::cerr << "Error setting non-blocking" << std::endl;
         return false;
     }
     return true;
@@ -77,7 +77,7 @@ bool SocketManager::setNonBlocking(int sock_fd) {
 int SocketManager::createListenSocket(const std::string& host, int port) {
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd < 0) {
-        std::cerr << "Error creating socket: " << strerror(errno) << std::endl;
+        std::cerr << "Error creating socket" << std::endl;
         return -1;
     }
     
@@ -102,14 +102,13 @@ int SocketManager::createListenSocket(const std::string& host, int port) {
     }
     
     if (bind(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        std::cerr << "Error binding to " << host << ":" << port 
-                  << " - " << strerror(errno) << std::endl;
+        std::cerr << "Error binding to " << host << ":" << port << std::endl;
         close(sock_fd);
         return -1;
     }
     
     if (listen(sock_fd, 128) < 0) {
-        std::cerr << "Error listening on socket: " << strerror(errno) << std::endl;
+        std::cerr << "Error listening on socket" << std::endl;
         close(sock_fd);
         return -1;
     }

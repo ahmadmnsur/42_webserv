@@ -190,6 +190,17 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
                 
                 // Process the HTTP request and generate response
                 HttpResponse response = processHttpRequest(request);
+                
+                // Handle keep-alive connections
+                bool should_keep_alive = request.isKeepAlive();
+                if (should_keep_alive) {
+                    response.setConnection(true);  // Set keep-alive
+                    _clients[client_sock].setKeepAlive(true);
+                } else {
+                    response.setConnection(false); // Set close
+                    _clients[client_sock].setKeepAlive(false);
+                }
+                
                 std::string response_str = response.toString();
                 
                 _clients[client_sock].setWriteBuffer(response_str);
@@ -471,7 +482,7 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
 /*
  * Handles reading data from a client socket
  * Receives data, processes it, or handles connection errors/disconnects
- * Uses non-blocking I/O and handles EAGAIN/EWOULDBLOCK appropriately
+ * Uses non-blocking I/O
  */
 void ConnectionHandler::handleClientRead(int client_sock) {
     char buffer[4096];
@@ -519,7 +530,17 @@ void ConnectionHandler::handleClientWrite(int client_sock) {
         
         if (client.getBytesSent() >= client.getWriteBuffer().size()) {
             std::cout << "Finished sending response to client " << client_sock << std::endl;
-            removeClient(client_sock);
+            
+            if (client.isKeepAlive()) {
+                // Keep connection alive - reset buffers for next request
+                std::cout << "Keeping connection alive for client " << client_sock << std::endl;
+                client.clearReadBuffer();
+                client.clearWriteBuffer();
+                client.setBytesSent(0);
+                client.setKeepAlive(false); // Reset for next request
+            } else {
+                removeClient(client_sock);
+            }
         }
     } else if (bytes_sent == 0) {
         std::cout << "Client " << client_sock << " closed connection during write" << std::endl;

@@ -10,6 +10,7 @@ private:
     std::string _write_buffer;
     size_t _bytes_sent;
     time_t _connection_time;
+    bool _keep_alive;
 
 public:
     ClientData();
@@ -20,11 +21,13 @@ public:
     const std::string& getWriteBuffer() const;
     size_t getBytesSent() const;
     time_t getConnectionTime() const;
+    bool isKeepAlive() const;
     
     // Setters
     void setReadBuffer(const std::string& buffer);
     void setWriteBuffer(const std::string& buffer);
     void setBytesSent(size_t bytes_sent);
+    void setKeepAlive(bool keep_alive);
     
     // Buffer operations
     void appendToReadBuffer(const std::string& data);

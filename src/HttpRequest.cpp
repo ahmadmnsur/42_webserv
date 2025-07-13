@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <vector>
 
 HttpRequest::HttpRequest() : _is_complete(false), _is_valid(false), _error_code(0) {}
 
@@ -133,6 +134,7 @@ bool HttpRequest::parseRequestLine(const std::string& line) {
 bool HttpRequest::parseHeader(const std::string& line) {
     size_t colon_pos = line.find(':');
     if (colon_pos == std::string::npos) {
+        _error_code = 400; // Bad Request - malformed header
         return false;
     }
     
@@ -140,7 +142,46 @@ bool HttpRequest::parseHeader(const std::string& line) {
     std::string value = trim(line.substr(colon_pos + 1));
     
     if (name.empty()) {
+        _error_code = 400; // Bad Request - empty header name
         return false;
+    }
+    
+    // Check for duplicate Host headers (RFC 7230 - MUST reject)
+    if (toLowerCase(name) == "host") {
+        if (_headers.find("host") != _headers.end()) {
+            // Duplicate Host header found - RFC 7230 requires 400 Bad Request
+            _error_code = 400;
+            return false;
+        }
+    }
+    
+    // Validate Content-Length header specifically
+    if (toLowerCase(name) == "content-length") {
+        // Check for non-numeric values
+        if (value.empty()) {
+            _error_code = 400; // Bad Request - empty Content-Length
+            return false;
+        }
+        
+        // Check for negative values by looking for minus sign
+        if (value[0] == '-') {
+            _error_code = 400; // Bad Request - negative Content-Length
+            return false;
+        }
+        
+        // Validate that the value is purely numeric
+        for (size_t i = 0; i < value.length(); ++i) {
+            if (!std::isdigit(value[i])) {
+                _error_code = 400; // Bad Request - non-numeric Content-Length
+                return false;
+            }
+        }
+        
+        // Check for extremely large values (potential overflow)
+        if (value.length() > 10) { // More than 10 digits (> 4GB) is suspicious
+            _error_code = 413; // Payload Too Large
+            return false;
+        }
     }
     
     _headers[toLowerCase(name)] = value;
@@ -154,8 +195,22 @@ bool HttpRequest::parse(const std::string& raw_request) {
         return false;
     }
     
-    // Skip line ending validation - be maximally tolerant
-    // This allows fragmented requests from various HTTP clients
+    // Validate line endings - HTTP/1.1 requires CRLF (\r\n)
+    // Check for malformed line endings that should be rejected
+    if (raw_request.find("\n") != std::string::npos) {
+        // Found LF, check if it's properly preceded by CR
+        size_t lf_pos = 0;
+        while ((lf_pos = raw_request.find("\n", lf_pos)) != std::string::npos) {
+            // Allow first LF if it's at position 0 (edge case)
+            if (lf_pos > 0 && raw_request[lf_pos - 1] != '\r') {
+                // Found LF not preceded by CR - malformed line ending
+                _error_code = 400;
+                _is_valid = false;
+                return false;
+            }
+            lf_pos++;
+        }
+    }
     
     std::istringstream stream(raw_request);
     std::string line;
@@ -191,40 +246,74 @@ bool HttpRequest::parse(const std::string& raw_request) {
     }
     
     // Read body if present
-    std::ostringstream body_stream;
-    std::string body_line;
-    bool has_content = false;
+    size_t expected_content_length = getContentLength();
     
-    while (std::getline(stream, body_line)) {
-        // Remove carriage return if present
-        if (!body_line.empty() && body_line[body_line.size() - 1] == '\r') {
-            body_line.erase(body_line.size() - 1);
+    if (expected_content_length > 0) {
+        // If Content-Length is specified, read exactly that many bytes
+        std::vector<char> body_buffer(expected_content_length);
+        stream.read(&body_buffer[0], expected_content_length);
+        size_t bytes_read = stream.gcount();
+        
+        _body = std::string(&body_buffer[0], bytes_read);
+        
+        // If we couldn't read the expected amount, the request is incomplete
+        // This will be handled by the completeness check later
+    } else {
+        // No Content-Length specified, read line by line (legacy behavior)
+        std::ostringstream body_stream;
+        std::string body_line;
+        bool has_content = false;
+        
+        while (std::getline(stream, body_line)) {
+            // Remove carriage return if present
+            if (!body_line.empty() && body_line[body_line.size() - 1] == '\r') {
+                body_line.erase(body_line.size() - 1);
+            }
+            
+            // Skip empty lines at the beginning, but preserve them if we already have content
+            if (body_line.empty() && !has_content) {
+                continue;
+            }
+            
+            if (!body_line.empty()) {
+                has_content = true;
+            }
+            
+            body_stream << body_line << "\n";
         }
         
-        // Skip empty lines at the beginning, but preserve them if we already have content
-        if (body_line.empty() && !has_content) {
-            continue;
+        _body = body_stream.str();
+        if (!_body.empty() && _body[_body.size() - 1] == '\n') {
+            _body.erase(_body.size() - 1);
         }
-        
-        if (!body_line.empty()) {
-            has_content = true;
-        }
-        
-        body_stream << body_line << "\n";
-    }
-    
-    _body = body_stream.str();
-    if (!_body.empty() && _body[_body.size() - 1] == '\n') {
-        _body.erase(_body.size() - 1);
     }
     
     // Check if request is complete
     size_t content_length = getContentLength();
     if (content_length > 0) {
-        // If Content-Length header is present, we must wait for that amount of body data
-        _is_complete = (_body.size() >= content_length);
-        
-        // Let incomplete requests be handled by timeout logic in connection handler
+        // If Content-Length header is present, validate exact body size match
+        if (_body.size() > content_length) {
+            // Body too long - 400 Bad Request
+            _error_code = 400;
+            _is_complete = true;
+            _is_valid = false;
+            return false;
+        } else if (_body.size() < content_length) {
+            // Body too short - check if we reached end of stream (no more data coming)
+            if (stream.eof()) {
+                // No more data available, but Content-Length expects more - 400 Bad Request
+                _error_code = 400;
+                _is_complete = true;
+                _is_valid = false;
+                return false;
+            } else {
+                // More data might be coming - mark as incomplete for timeout handling
+                _is_complete = false;
+            }
+        } else {
+            // Exact match - request is complete
+            _is_complete = true;
+        }
     } else if (_method == "POST" || _method == "PUT" || _method == "PATCH") {
         // For methods that typically have bodies, if no Content-Length is specified, 
         // the request is incomplete unless explicitly stated otherwise

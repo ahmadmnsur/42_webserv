@@ -5,7 +5,7 @@
  * Default constructor for ClientData
  * Initializes with empty buffers and zero bytes sent
  */
-ClientData::ClientData() : _bytes_sent(0), _connection_time(time(NULL)) {}
+ClientData::ClientData() : _bytes_sent(0), _connection_time(time(NULL)), _keep_alive(false) {}
 
 /*
  * Destructor for ClientData
@@ -102,4 +102,20 @@ void ClientData::clearReadBuffer() {
  */
 void ClientData::clearWriteBuffer() {
     _write_buffer.clear();
+}
+
+/*
+ * Returns whether this connection should be kept alive
+ * Used for HTTP/1.1 keep-alive connection handling
+ */
+bool ClientData::isKeepAlive() const {
+    return _keep_alive;
+}
+
+/*
+ * Sets the keep-alive flag for this connection
+ * Used to control whether connection should be closed after response
+ */
+void ClientData::setKeepAlive(bool keep_alive) {
+    _keep_alive = keep_alive;
 }

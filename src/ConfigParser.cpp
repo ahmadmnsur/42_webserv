@@ -356,10 +356,10 @@ Location ConfigParser::parseLocationBlock() {
                 std::string extension = tokens[i];
                 std::string path = tokens[i + 1];
                 
-                // Validate that only .py, .php, and .bla extensions are supported
-                if (extension != ".py" && extension != ".php" && extension != ".bla") {
-                    std::cerr << "Error: Unsupported CGI extension '" << extension << "'. Only .py, .php, and .bla are supported." << std::endl;
-                    _validator.addError("Unsupported CGI extension '" + extension + "'. Only .py, .php, and .bla are supported.");
+                // Validate that only .py, .php extensions are supported
+                if (extension != ".py" && extension != ".php") {
+                    std::cerr << "Error: Unsupported CGI extension '" << extension << "'. Only .py, .php" << std::endl;
+                    _validator.addError("Unsupported CGI extension '" + extension + "'. Only .py, .php");
                     return location;
                 }
                 
@@ -522,15 +522,38 @@ ServerConfig ConfigParser::parseServerBlock() {
             if (hasNextToken()) {
                 std::string size_str = getNextToken();
                 size_t max_body_size = std::atoi(size_str.c_str());
-                // Handle size suffixes (k, m, g)
+                // Handle size suffixes (k/kb, m/mb, g/gb)
                 if (!size_str.empty()) {
-                    char suffix = size_str[size_str.length() - 1];
-                    if (suffix == 'k' || suffix == 'K') {
-                        max_body_size *= 1024;
-                    } else if (suffix == 'm' || suffix == 'M') {
-                        max_body_size *= 1024 * 1024;
-                    } else if (suffix == 'g' || suffix == 'G') {
-                        max_body_size *= 1024 * 1024 * 1024;
+                    // Check for double-letter suffixes first (kb, mb, gb)
+                    if (size_str.length() >= 2) {
+                        std::string suffix = size_str.substr(size_str.length() - 2);
+                        if (suffix == "kb" || suffix == "KB") {
+                            max_body_size *= 1024;
+                        } else if (suffix == "mb" || suffix == "MB") {
+                            max_body_size *= 1024 * 1024;
+                        } else if (suffix == "gb" || suffix == "GB") {
+                            max_body_size *= 1024 * 1024 * 1024;
+                        } else {
+                            // Check for single-letter suffixes (k, m, g)
+                            char single_suffix = size_str[size_str.length() - 1];
+                            if (single_suffix == 'k' || single_suffix == 'K') {
+                                max_body_size *= 1024;
+                            } else if (single_suffix == 'm' || single_suffix == 'M') {
+                                max_body_size *= 1024 * 1024;
+                            } else if (single_suffix == 'g' || single_suffix == 'G') {
+                                max_body_size *= 1024 * 1024 * 1024;
+                            }
+                        }
+                    } else {
+                        // Single character string, check for suffix
+                        char single_suffix = size_str[size_str.length() - 1];
+                        if (single_suffix == 'k' || single_suffix == 'K') {
+                            max_body_size *= 1024;
+                        } else if (single_suffix == 'm' || single_suffix == 'M') {
+                            max_body_size *= 1024 * 1024;
+                        } else if (single_suffix == 'g' || single_suffix == 'G') {
+                            max_body_size *= 1024 * 1024 * 1024;
+                        }
                     }
                 }
                 config.setMaxBodySize(max_body_size);

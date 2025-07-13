@@ -113,10 +113,8 @@ void WebServer::run() {
         int poll_count = poll(&_poll_fds[0], _poll_fds.size(), 1000); // 1 second timeout
         
         if (poll_count < 0) {
-            if (errno == EINTR) {
-                break;
-            }
-            std::cerr << "Poll error: " << strerror(errno) << std::endl;
+            // Poll error - do not check errno as per 42 requirements
+            std::cerr << "Poll error occurred" << std::endl;
             break;
         }
         
