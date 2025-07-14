@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebServ 42 - Sample HTML</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2563eb;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 10px;
+        }
+        .feature {
+            background: #e8f4f8;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #2563eb;
+        }
+        .code {
+            background: #f1f3f4;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 WebServ 42 - Sample HTML File</h1>
+        
+        <p>This is a sample HTML file demonstrating the server's ability to serve static HTML content with proper MIME type detection.</p>
+        
+        <h2>Server Features Being Tested:</h2>
+        
+        <div class="feature">
+            <strong>MIME Type Detection:</strong> Server correctly identifies this as <code>text/html</code>
+        </div>
+        
+        <div class="feature">
+            <strong>HTTP Headers:</strong> Proper Content-Type and Content-Length headers
+        </div>
+        
+        <div class="feature">
+            <strong>Static File Serving:</strong> Files served directly from filesystem
+        </div>
+        
+        <div class="feature">
+            <strong>Character Encoding:</strong> UTF-8 encoding properly handled
+        </div>
+        
+        <h2>HTTP Request Example:</h2>
+        <div class="code">
+            GET /demo/sample.html HTTP/1.1<br>
+            Host: localhost:8080<br>
+            User-Agent: Mozilla/5.0...<br>
+            Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+        </div>
+        
+        <h2>Expected Response:</h2>
+        <div class="code">
+            HTTP/1.1 200 OK<br>
+            Content-Type: text/html<br>
+            Content-Length: [file_size]<br>
+            Connection: keep-alive<br>
+            <br>
+            [HTML content]
+        </div>
+        
+        <p><strong>Status:</strong> ✅ HTML file serving working correctly!</p>
+        
+        <p><a href="/" style="color: #2563eb;">← Back to WebServ 42 Demo</a></p>
+    </div>
+</body>
+</html>

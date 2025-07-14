@@ -50,6 +50,7 @@ public:
     static HttpResponse createLengthRequiredResponse();
     static HttpResponse createRequestTimeoutResponse();
     static HttpResponse createRequestEntityTooLargeResponse();
+    static HttpResponse createRedirectResponse(const std::string& redirect_info);
     
     void clear();
 };

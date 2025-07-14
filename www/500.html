@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>500 - Internal Server Error | WebServ 42</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .error-container {
+            text-align: center;
+            max-width: 600px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .error-code {
+            font-size: 8rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #fbbf24, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+        }
+        
+        .error-title {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        .error-message {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .error-details {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .error-details h3 {
+            margin-bottom: 10px;
+            color: #fbbf24;
+        }
+        
+        .error-details ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        
+        .error-details li {
+            margin: 8px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .error-details li:before {
+            content: "⚠";
+            position: absolute;
+            left: 0;
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: white;
+            color: #dc2626;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            margin: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+        
+        .btn-secondary:hover {
+            background: white;
+            color: #dc2626;
+        }
+        
+        .server-info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .server-info h4 {
+            color: #fbbf24;
+            margin-bottom: 10px;
+        }
+        
+        .glitch {
+            animation: glitch 2s infinite;
+        }
+        
+        @keyframes glitch {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            10% {
+                transform: translateX(-2px);
+            }
+            20% {
+                transform: translateX(2px);
+            }
+            30% {
+                transform: translateX(-2px);
+            }
+            40% {
+                transform: translateX(2px);
+            }
+            50% {
+                transform: translateX(-2px);
+            }
+            60% {
+                transform: translateX(2px);
+            }
+            70% {
+                transform: translateX(-2px);
+            }
+            80% {
+                transform: translateX(2px);
+            }
+            90% {
+                transform: translateX(-2px);
+            }
+        }
+        
+        .sparks {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .spark {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #fbbf24;
+            border-radius: 50%;
+            animation: spark 3s infinite;
+        }
+        
+        @keyframes spark {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            50% {
+                transform: translateY(50vh) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(0) scale(0);
+                opacity: 0;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .error-code {
+                font-size: 5rem;
+            }
+            
+            .error-title {
+                font-size: 1.8rem;
+            }
+            
+            .error-message {
+                font-size: 1rem;
+            }
+            
+            .error-container {
+                padding: 20px;
+                margin: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sparks">
+        <div class="spark" style="left: 10%; animation-delay: 0s;"></div>
+        <div class="spark" style="left: 20%; animation-delay: 0.5s;"></div>
+        <div class="spark" style="left: 30%; animation-delay: 1s;"></div>
+        <div class="spark" style="left: 40%; animation-delay: 1.5s;"></div>
+        <div class="spark" style="left: 50%; animation-delay: 2s;"></div>
+        <div class="spark" style="left: 60%; animation-delay: 2.5s;"></div>
+        <div class="spark" style="left: 70%; animation-delay: 3s;"></div>
+        <div class="spark" style="left: 80%; animation-delay: 3.5s;"></div>
+        <div class="spark" style="left: 90%; animation-delay: 4s;"></div>
+    </div>
+    
+    <div class="error-container">
+        <div class="error-code glitch">500</div>
+        <h1 class="error-title">Internal Server Error</h1>
+        <p class="error-message">
+            Something went wrong on our end. The server encountered an unexpected condition.
+        </p>
+        
+        <div class="error-details">
+            <h3>🔧 Possible Causes:</h3>
+            <ul>
+                <li>Server configuration error</li>
+                <li>CGI script execution failed</li>
+                <li>Resource exhaustion</li>
+                <li>File system permissions</li>
+                <li>Memory allocation failure</li>
+            </ul>
+        </div>
+        
+        <div class="error-details">
+            <h3>🚨 What to do:</h3>
+            <ul>
+                <li>Try refreshing the page</li>
+                <li>Wait a moment and try again</li>
+                <li>Check server logs for details</li>
+                <li>Contact the administrator</li>
+            </ul>
+        </div>
+        
+        <div>
+            <a href="/" class="btn">🏠 Go Home</a>
+            <a href="javascript:location.reload()" class="btn btn-secondary">🔄 Retry</a>
+        </div>
+        
+        <div class="server-info">
+            <h4>Server Information</h4>
+            <p><strong>Server:</strong> WebServ 42</p>
+            <p><strong>HTTP Version:</strong> HTTP/1.1</p>
+            <p><strong>Error Code:</strong> 500 Internal Server Error</p>
+            <p><strong>Time:</strong> <span id="current-time"></span></p>
+            <p><strong>Process:</strong> Request processing failed</p>
+        </div>
+    </div>
+    
+    <script>
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleString();
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>

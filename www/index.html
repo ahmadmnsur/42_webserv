@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebServ 42 - Modern HTTP Server</title>
+    <link rel="stylesheet" href="/assets/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="logo">🚀</span>
+                <span class="brand-text">WebServ 42</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#home" class="nav-link">Home</a></li>
+                <li><a href="#features" class="nav-link">Features</a></li>
+                <li><a href="#demo" class="nav-link">Demo</a></li>
+                <li><a href="#cgi" class="nav-link">CGI</a></li>
+                <li><a href="#tests" class="nav-link">Tests</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Hero Section -->
+        <section id="home" class="hero">
+            <div class="hero-container">
+                <div class="hero-content">
+                    <h1 class="hero-title">
+                        <span class="highlight">WebServ 42</span>
+                        <br>HTTP/1.1 Server
+                    </h1>
+                    <p class="hero-subtitle">
+                        A robust, high-performance HTTP server implementation in C++98
+                        <br>Built for 42 School with modern web standards compliance
+                    </p>
+                    <div class="hero-buttons">
+                        <a href="#demo" class="btn btn-primary">Try Demo</a>
+                        <a href="#features" class="btn btn-secondary">Features</a>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <div class="terminal-buttons">
+                                <span class="btn-close"></span>
+                                <span class="btn-minimize"></span>
+                                <span class="btn-maximize"></span>
+                            </div>
+                            <div class="terminal-title">webserv</div>
+                        </div>
+                        <div class="terminal-body">
+                            <div class="terminal-line">
+                                <span class="prompt">$</span>
+                                <span class="command">./webserv config.conf</span>
+                            </div>
+                            <div class="terminal-line">
+                                <span class="output">✅ Server running on 127.0.0.1:8080</span>
+                            </div>
+                            <div class="terminal-line">
+                                <span class="output">🚀 HTTP/1.1 Ready</span>
+                            </div>
+                            <div class="terminal-line">
+                                <span class="output">📊 CGI Support: ✅</span>
+                            </div>
+                            <div class="terminal-line cursor">
+                                <span class="prompt">$</span>
+                                <span class="command typing">curl localhost:8080</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features">
+            <div class="container">
+                <h2 class="section-title">Server Features</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🌐</div>
+                        <h3>HTTP/1.1 Compliant</h3>
+                        <p>Full HTTP/1.1 protocol support with GET, POST, DELETE methods and proper header handling</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Non-blocking I/O</h3>
+                        <p>Asynchronous request handling using select/poll for maximum performance and scalability</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔧</div>
+                        <h3>CGI Support</h3>
+                        <p>Execute Python and PHP scripts with proper environment variable handling</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📁</div>
+                        <h3>File Upload</h3>
+                        <p>Handle file uploads with configurable size limits and storage locations</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🗂️</div>
+                        <h3>Directory Listing</h3>
+                        <p>Automatic directory indexing with customizable index files</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔀</div>
+                        <h3>URL Redirection</h3>
+                        <p>Flexible URL routing and redirection with location-based configuration</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3>Error Handling</h3>
+                        <p>Comprehensive error pages with custom 404, 500, and other HTTP status codes</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚙️</div>
+                        <h3>Configuration</h3>
+                        <p>Nginx-inspired configuration syntax with virtual hosts and location blocks</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Demo Section -->
+        <section id="demo" class="demo">
+            <div class="container">
+                <h2 class="section-title">Interactive Demo</h2>
+                <div class="demo-grid">
+                    <div class="demo-card">
+                        <h3>📄 Static Files</h3>
+                        <p>Test static file serving with different MIME types</p>
+                        <div class="demo-buttons">
+                            <a href="/demo/sample.txt" class="btn btn-small" target="_blank">Text File</a>
+                            <a href="/demo/sample.html" class="btn btn-small" target="_blank">HTML File</a>
+                            <a href="/demo/sample.json" class="btn btn-small" target="_blank">JSON File</a>
+                        </div>
+                    </div>
+                    
+                    <div class="demo-card">
+                        <h3>📤 File Upload</h3>
+                        <p>Upload files to the server with size validation</p>
+                        <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+                            <input type="file" name="file" class="file-input" required>
+                            <button type="submit" class="btn btn-small">Upload</button>
+                        </form>
+                    </div>
+                    
+                    <div class="demo-card">
+                        <h3>🗂️ Directory Listing</h3>
+                        <p>Browse directories with automatic indexing</p>
+                        <div class="demo-buttons">
+                            <a href="/demo/" class="btn btn-small" target="_blank">Demo Directory</a>
+                            <a href="/upload/" class="btn btn-small" target="_blank">Upload Directory</a>
+                        </div>
+                    </div>
+                    
+                    <div class="demo-card">
+                        <h3>❌ Error Pages</h3>
+                        <p>Custom error page handling</p>
+                        <div class="demo-buttons">
+                            <a href="/nonexistent" class="btn btn-small" target="_blank">404 Error</a>
+                            <a href="/forbidden" class="btn btn-small" target="_blank">403 Error</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CGI Section -->
+        <section id="cgi" class="cgi">
+            <div class="container">
+                <h2 class="section-title">CGI Demonstrations</h2>
+                <div class="cgi-grid">
+                    <div class="cgi-card">
+                        <h3>🐍 Python CGI</h3>
+                        <p>Server-side Python script execution</p>
+                        <div class="cgi-buttons">
+                            <a href="/cgi-bin/hello.py" class="btn btn-primary" target="_blank">Environment Info</a>
+                            <a href="/cgi-bin/form.py" class="btn btn-secondary" target="_blank">Form Handler</a>
+                        </div>
+                    </div>
+                    
+                    <div class="cgi-card">
+                        <h3>📊 System Info</h3>
+                        <p>Display server and system information</p>
+                        <div class="cgi-buttons">
+                            <a href="/cgi-bin/sysinfo.py" class="btn btn-primary" target="_blank">System Info</a>
+                            <a href="/cgi-bin/headers.py" class="btn btn-secondary" target="_blank">HTTP Headers</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="cgi-demo">
+                    <h3>Interactive Form Demo</h3>
+                    <form action="/cgi-bin/form.py" method="post" class="contact-form">
+                        <div class="form-group">
+                            <label for="name">Name:</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email:</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="message">Message:</label>
+                            <textarea id="message" name="message" rows="4" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Send Message</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tests Section -->
+        <section id="tests" class="tests">
+            <div class="container">
+                <h2 class="section-title">Server Tests</h2>
+                <div class="tests-grid">
+                    <div class="test-card">
+                        <h3>🔍 HTTP Methods</h3>
+                        <div class="test-buttons">
+                            <button onclick="testMethod('GET')" class="btn btn-test">GET</button>
+                            <button onclick="testMethod('POST')" class="btn btn-test">POST</button>
+                            <button onclick="testMethod('DELETE')" class="btn btn-test">DELETE</button>
+                            <button onclick="testMethod('HEAD')" class="btn btn-test">HEAD</button>
+                        </div>
+                        <div id="method-result" class="test-result"></div>
+                    </div>
+                    
+                    <div class="test-card">
+                        <h3>📊 Performance</h3>
+                        <div class="test-buttons">
+                            <button onclick="testConcurrency()" class="btn btn-test">Concurrent Requests</button>
+                            <button onclick="testLargeFile()" class="btn btn-test">Large File</button>
+                        </div>
+                        <div id="perf-result" class="test-result"></div>
+                    </div>
+                    
+                    <div class="test-card">
+                        <h3>🛡️ Security</h3>
+                        <div class="test-buttons">
+                            <button onclick="testSecurity()" class="btn btn-test">Path Traversal</button>
+                            <button onclick="testHeaders()" class="btn btn-test">Header Injection</button>
+                        </div>
+                        <div id="security-result" class="test-result"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>WebServ 42</h4>
+                    <p>A modern HTTP/1.1 server implementation following RFC specifications and 42 School standards.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Features</h4>
+                    <ul>
+                        <li>HTTP/1.1 Protocol</li>
+                        <li>CGI Support</li>
+                        <li>File Upload</li>
+                        <li>Non-blocking I/O</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Tech Stack</h4>
+                    <ul>
+                        <li>C++98</li>
+                        <li>Socket Programming</li>
+                        <li>Select/Poll</li>
+                        <li>POSIX Compliance</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 WebServ 42. Built with ❤️ at 42 School.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found | WebServ 42</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .error-container {
+            text-align: center;
+            max-width: 600px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .error-code {
+            font-size: 8rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+        }
+        
+        .error-title {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        .error-message {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .error-details {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .error-details h3 {
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+        
+        .error-details ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        
+        .error-details li {
+            margin: 8px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .error-details li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #ffd700;
+            font-weight: bold;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: white;
+            color: #2563eb;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            margin: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+        
+        .btn-secondary:hover {
+            background: white;
+            color: #2563eb;
+        }
+        
+        .server-info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .server-info h4 {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+        
+        .floating-elements {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .floating-elements span {
+            position: absolute;
+            display: block;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            animation: float 15s infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10%, 90% {
+                opacity: 1;
+            }
+            50% {
+                transform: translateY(-10vh) rotate(180deg);
+            }
+        }
+        
+        .floating-elements span:nth-child(1) { left: 10%; animation-delay: 0s; }
+        .floating-elements span:nth-child(2) { left: 20%; animation-delay: 2s; }
+        .floating-elements span:nth-child(3) { left: 30%; animation-delay: 4s; }
+        .floating-elements span:nth-child(4) { left: 40%; animation-delay: 6s; }
+        .floating-elements span:nth-child(5) { left: 50%; animation-delay: 8s; }
+        .floating-elements span:nth-child(6) { left: 60%; animation-delay: 10s; }
+        .floating-elements span:nth-child(7) { left: 70%; animation-delay: 12s; }
+        .floating-elements span:nth-child(8) { left: 80%; animation-delay: 14s; }
+        .floating-elements span:nth-child(9) { left: 90%; animation-delay: 16s; }
+        
+        @media (max-width: 768px) {
+            .error-code {
+                font-size: 5rem;
+            }
+            
+            .error-title {
+                font-size: 1.8rem;
+            }
+            
+            .error-message {
+                font-size: 1rem;
+            }
+            
+            .error-container {
+                padding: 20px;
+                margin: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="floating-elements">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+    
+    <div class="error-container">
+        <div class="error-code">404</div>
+        <h1 class="error-title">Page Not Found</h1>
+        <p class="error-message">
+            The requested resource could not be found on this server.
+        </p>
+        
+        <div class="error-details">
+            <h3>🔍 What happened?</h3>
+            <ul>
+                <li>The URL you entered doesn't exist</li>
+                <li>The page may have been moved or deleted</li>
+                <li>You might have a typo in the URL</li>
+                <li>The resource is not available</li>
+            </ul>
+        </div>
+        
+        <div class="error-details">
+            <h3>🚀 Try these instead:</h3>
+            <ul>
+                <li>Go back to the homepage</li>
+                <li>Check the URL for typos</li>
+                <li>Use the navigation menu</li>
+                <li>Contact the administrator</li>
+            </ul>
+        </div>
+        
+        <div>
+            <a href="/" class="btn">🏠 Go Home</a>
+            <a href="javascript:history.back()" class="btn btn-secondary">← Go Back</a>
+        </div>
+        
+        <div class="server-info">
+            <h4>Server Information</h4>
+            <p><strong>Server:</strong> WebServ 42</p>
+            <p><strong>HTTP Version:</strong> HTTP/1.1</p>
+            <p><strong>Error Code:</strong> 404 Not Found</p>
+            <p><strong>Time:</strong> <span id="current-time"></span></p>
+        </div>
+    </div>
+    
+    <script>
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleString();
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>

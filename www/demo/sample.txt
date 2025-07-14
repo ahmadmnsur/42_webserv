@@ -1,0 +1,27 @@
+WebServ 42 - Sample Text File
+=============================
+
+This is a sample text file to demonstrate static file serving capabilities.
+
+Features demonstrated:
+- MIME type detection (text/plain)
+- File content serving
+- HTTP headers (Content-Type, Content-Length)
+- Character encoding handling
+
+Server Information:
+- HTTP/1.1 compliant
+- Non-blocking I/O
+- Built with C++98
+- 42 School project
+
+Test different file types:
+- .txt (text/plain)
+- .html (text/html)
+- .css (text/css)
+- .js (application/javascript)
+- .json (application/json)
+- .png (image/png)
+- .jpg (image/jpeg)
+
+This file can be accessed via GET request to test the server's static file handling capabilities.

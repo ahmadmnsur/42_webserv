@@ -195,20 +195,24 @@ bool HttpRequest::parse(const std::string& raw_request) {
         return false;
     }
     
-    // Validate line endings - HTTP/1.1 requires CRLF (\r\n)
-    // Check for malformed line endings that should be rejected
-    if (raw_request.find("\n") != std::string::npos) {
-        // Found LF, check if it's properly preceded by CR
-        size_t lf_pos = 0;
-        while ((lf_pos = raw_request.find("\n", lf_pos)) != std::string::npos) {
-            // Allow first LF if it's at position 0 (edge case)
-            if (lf_pos > 0 && raw_request[lf_pos - 1] != '\r') {
-                // Found LF not preceded by CR - malformed line ending
-                _error_code = 400;
-                _is_valid = false;
-                return false;
+    // Validate line endings for headers only - body content can have mixed line endings
+    // Find where headers end (first occurrence of \r\n\r\n)
+    size_t headers_end = raw_request.find("\r\n\r\n");
+    if (headers_end != std::string::npos) {
+        std::string headers_part = raw_request.substr(0, headers_end + 4);
+        
+        // Validate CRLF only in headers section
+        if (headers_part.find("\n") != std::string::npos) {
+            size_t lf_pos = 0;
+            while ((lf_pos = headers_part.find("\n", lf_pos)) != std::string::npos) {
+                if (lf_pos > 0 && headers_part[lf_pos - 1] != '\r') {
+                    // Found LF not preceded by CR in headers - malformed
+                    _error_code = 400;
+                    _is_valid = false;
+                    return false;
+                }
+                lf_pos++;
             }
-            lf_pos++;
         }
     }
     

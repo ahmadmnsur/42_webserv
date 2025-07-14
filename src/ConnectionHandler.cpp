@@ -170,7 +170,7 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
             // Check Content-Length against max_body_size before reading complete body
             if (request.hasHeader("Content-Length") || request.hasHeader("content-length")) {
                 size_t content_length = request.getContentLength();
-                const ServerConfig* server_config = getCurrentServerConfig();
+                const ServerConfig* server_config = getCurrentServerConfig(client_sock);
                 if (server_config && content_length > server_config->getMaxBodySize()) {
                     std::cout << "Request body too large: " << content_length 
                               << " > " << server_config->getMaxBodySize() << std::endl;
@@ -247,9 +247,38 @@ void ConnectionHandler::processClientData(int client_sock, const char* buffer, s
         
         // Check for empty request or malformed request
         bool is_empty_request = (accumulated_data.empty());
-        bool is_malformed = (accumulated_data.size() > 0 && accumulated_data.find(' ') == std::string::npos);
+        // Only check for malformed if we have header termination - don't reject partial data
+        bool is_malformed = false;
+        if (has_header_termination) {
+            // Check if the first line looks like a valid HTTP request
+            size_t first_line_end = accumulated_data.find('\n');
+            if (first_line_end != std::string::npos) {
+                std::string first_line = accumulated_data.substr(0, first_line_end);
+                // Remove \r if present
+                if (!first_line.empty() && first_line[first_line.length() - 1] == '\r') {
+                    first_line.erase(first_line.length() - 1);
+                }
+                // Check if first line has at least 2 spaces (METHOD URI HTTP/VERSION)
+                size_t first_space = first_line.find(' ');
+                size_t second_space = (first_space != std::string::npos) ? first_line.find(' ', first_space + 1) : std::string::npos;
+                is_malformed = (first_space == std::string::npos || second_space == std::string::npos);
+                
+
+             // Also check for invalid methods if the structure is correct
+             if (!is_malformed && first_space != std::string::npos) {
+                 std::string method = first_line.substr(0, first_space);
+                 // Check if method contains invalid characters or is not a recognized method
+                 if (method.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ") != std::string::npos ||
+                     (method != "GET" && method != "POST" && method != "DELETE" && method != "HEAD" && 
+                      method != "PUT" && method != "PATCH" && method != "OPTIONS" && method != "TRACE" && 
+                      method != "CONNECT" && method != "PROPFIND")) {
+                     is_malformed = true;
+                 }
+             }
+            }
+        }
         
-        if (has_header_termination || is_empty_request || is_malformed) {
+        if (is_empty_request || is_malformed) {
             // This appears to be a malformed or empty request, not incomplete
             std::cout << "Malformed or empty HTTP request from client " << client_sock << std::endl;
             HttpResponse response = HttpResponse::createBadRequestResponse();
@@ -277,13 +306,18 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
     // Sanitize path to prevent directory traversal attacks
     std::string sanitized_uri = sanitizePath(uri);
     if (sanitized_uri.empty()) {
-        return HttpResponse::createNotFoundResponse();  // Dangerous path detected - return 404 for security
+        return HttpResponse::createBadRequestResponse();  // Malformed path - return 400 Bad Request
     }
     
     // Find matching location
     const Location* location = findMatchingLocation(sanitized_uri);
     if (!location) {
-        return HttpResponse::createNotFoundResponse();
+        return createErrorResponse(404);
+    }
+    
+    // Check for redirect before processing methods
+    if (!location->getRedirect().empty()) {
+        return HttpResponse::createRedirectResponse(location->getRedirect());
     }
     
     // Body size validation is now handled earlier in processClientData
@@ -314,31 +348,14 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
     
     // Handle GET and HEAD requests with proper file serving logic
     if (method == "GET" || method == "HEAD") {
-        if (sanitized_uri == "/") {
-            // Return a welcome page for root
-            std::string body = "<html><body><h1>Welcome to WebServ</h1><p>HTTP/1.1 Server</p></body></html>";
-            if (method == "HEAD") {
-                return HttpResponse::createHeadResponse("text/html", body.length());
-            } else {
-                return HttpResponse::createOkResponse(body, "text/html");
-            }
-        } else {
             // Construct the full file path
             std::string file_path = location->getRoot();
             if (file_path.empty() || file_path[file_path.length() - 1] != '/') {
                 file_path += "/";
             }
             
-            // Remove the location path prefix from the URI to get the relative path
-            std::string relative_path = sanitized_uri;
-            if (sanitized_uri.find(location->getPath()) == 0) {
-                relative_path = sanitized_uri.substr(location->getPath().length());
-                if (!relative_path.empty() && relative_path[0] == '/') {
-                    relative_path = relative_path.substr(1);
-                }
-            }
-            
-            file_path += relative_path;
+            // Nginx-style path construction: simply concatenate root + URI
+            file_path += sanitized_uri;
             
             // Check if the path exists
             struct stat path_stat;
@@ -359,39 +376,96 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
                         if (access(index_path.c_str(), F_OK) == 0) {
                             // Index file found, serve it
                             std::string detected_mime = getMimeType(*it);
-                            std::string body = "<html><body><h1>Index File Found: " + *it + "</h1>";
-                            body += "<p>Directory: " + sanitized_uri + "</p>";
-                            body += "<p>Index Path: " + index_path + "</p>";
-                            body += "<p>Detected MIME Type: " + detected_mime + "</p>";
-                            body += "</body></html>";
-                            return HttpResponse::createOkResponse(body, "text/html");
+                            
+                            // Read the actual file content
+                            std::ifstream file(index_path.c_str(), std::ios::binary);
+                            if (file.is_open()) {
+                                std::string file_content((std::istreambuf_iterator<char>(file)),
+                                                        std::istreambuf_iterator<char>());
+                                file.close();
+                                return HttpResponse::createOkResponse(file_content, detected_mime);
+                            } else {
+                                return HttpResponse::createForbiddenResponse();
+                            }
                         }
                     }
                     
-                    // No index file found - return 404 to match tester expectations
-                    // The ubuntu_tester expects 404 when index file is not found
-                    return HttpResponse::createNotFoundResponse();
-                } else {
-                    // It's a regular file - serve the actual file content
-                    std::string detected_mime = getMimeType(sanitized_uri);
-                    
-                    // Read the file content
-                    std::ifstream file(file_path.c_str(), std::ios::binary);
-                    if (file.is_open()) {
-                        std::string file_content((std::istreambuf_iterator<char>(file)),
-                                                std::istreambuf_iterator<char>());
-                        file.close();
-                        return HttpResponse::createOkResponse(file_content, detected_mime);
+                    // No index file found - check if autoindex is enabled
+                    if (location->getAutoindex()) {
+                        // Generate directory listing
+                        std::string body = "<html><head><title>Directory listing for " + sanitized_uri + "</title></head><body>";
+                        body += "<h1>Directory listing for " + sanitized_uri + "</h1><hr>";
+                        body += "<ul>";
+                        
+                        DIR* dir = opendir(file_path.c_str());
+                        if (dir) {
+                            struct dirent* entry;
+                            while ((entry = readdir(dir)) != NULL) {
+                                std::string name = entry->d_name;
+                                if (name != "." && name != "..") {
+                                    std::string href = sanitized_uri;
+                                    if (href[href.length() - 1] != '/') href += "/";
+                                    href += name;
+                                    body += "<li><a href=\"" + href + "\">" + name + "</a></li>";
+                                }
+                            }
+                            closedir(dir);
+                        }
+                        
+                        body += "</ul><hr></body></html>";
+                        return HttpResponse::createOkResponse(body, "text/html");
                     } else {
-                        // File exists but can't be read - return 403 Forbidden
-                        return HttpResponse::createForbiddenResponse();
+                        return createErrorResponse(403);
+                    }
+                } else {
+                    // It's a regular file - check if it's a CGI script first
+                    std::string file_extension;
+                    size_t dot_pos = sanitized_uri.find_last_of('.');
+                    if (dot_pos != std::string::npos) {
+                        file_extension = sanitized_uri.substr(dot_pos);
+                    }
+                    
+                    // Get CGI extensions from location
+                    const std::map<std::string, std::string>& cgi_extensions = location->getCgiExtensions();
+                    std::map<std::string, std::string>::const_iterator cgi_it = cgi_extensions.find(file_extension);
+                    
+                    if (cgi_it != cgi_extensions.end()) {
+                        // This is a CGI request - execute the script
+                        return executeCgiScript(file_path, cgi_it->second, request, file_path);
+                    } else {
+                        // It's a regular file - serve the actual file content
+                        std::string detected_mime = getMimeType(sanitized_uri);
+                        
+                        // Read the file content
+                        std::ifstream file(file_path.c_str(), std::ios::binary);
+                        if (file.is_open()) {
+                            std::string file_content((std::istreambuf_iterator<char>(file)),
+                                                    std::istreambuf_iterator<char>());
+                            file.close();
+                            return HttpResponse::createOkResponse(file_content, detected_mime);
+                        } else {
+                            // File exists but can't be read - return 403 Forbidden
+                            return HttpResponse::createForbiddenResponse();
+                        }
                     }
                 }
             } else {
-                // Path does not exist, return 404
-                return HttpResponse::createNotFoundResponse();
+                // Path does not exist, return custom 404
+                std::ifstream error_file("./www/404.html", std::ios::binary);
+                if (error_file.is_open()) {
+                    std::string file_content((std::istreambuf_iterator<char>(error_file)),
+                                            std::istreambuf_iterator<char>());
+                    error_file.close();
+                    HttpResponse response;
+                    response.setStatusCode(404);
+                    response.setContentType("text/html");
+                    response.setBody(file_content);
+                    response.setConnection(false);
+                    return response;
+                } else {
+                    return createErrorResponse(404);
+                }
             }
-        }
     } else if (method == "POST") {
         // Check if this is a CGI request
         std::string file_extension;
@@ -411,28 +485,27 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
                 file_path += "/";
             }
             
-            // Remove the location path prefix from the URI to get the relative path
-            std::string relative_path = sanitized_uri;
-            if (sanitized_uri.find(location->getPath()) == 0) {
-                relative_path = sanitized_uri.substr(location->getPath().length());
-                if (!relative_path.empty() && relative_path[0] == '/') {
-                    relative_path = relative_path.substr(1);
-                }
-            }
-            
-            file_path += relative_path;
+            // Nginx-style path construction: simply concatenate root + URI
+            file_path += sanitized_uri;
             
             // Check if the CGI script file exists
             if (access(file_path.c_str(), F_OK) == 0) {
                 // Execute CGI script
                 return executeCgiScript(file_path, cgi_it->second, request, file_path);
             } else {
-                return HttpResponse::createNotFoundResponse();
+                return createErrorResponse(404);
             }
         } else {
-            // Regular POST request (not CGI)
-            std::string body = "POST request received\nURI: " + sanitized_uri + "\nBody: " + request.getBody();
-            return HttpResponse::createOkResponse(body, "text/plain");
+            // Check if this is a file upload request
+            std::string upload_path = location->getUploadPath();
+            if (!upload_path.empty()) {
+                // This is an upload location - handle file upload
+                return handleFileUpload(request, location, sanitized_uri);
+            } else {
+                // Regular POST request (not CGI)
+                std::string body = "POST request received\nURI: " + sanitized_uri + "\nBody: " + request.getBody();
+                return HttpResponse::createOkResponse(body, "text/plain");
+            }
         }
     } else if (method == "DELETE") {
         std::string body = "DELETE request received\nURI: " + sanitized_uri;
@@ -485,7 +558,7 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
  * Uses non-blocking I/O
  */
 void ConnectionHandler::handleClientRead(int client_sock) {
-    char buffer[4096];
+    char buffer[65536];  // Increased to 64KB to handle larger bodies
     ssize_t bytes_read = recv(client_sock, buffer, sizeof(buffer) - 1, 0);
     
     if (bytes_read > 0) {
@@ -714,14 +787,33 @@ std::string ConnectionHandler::getMimeType(const std::string& path) const {
 }
 
 /*
- * Returns the current server configuration
- * For simplicity, returns the first server config (can be enhanced for virtual hosts)
+ * Returns the current server configuration based on the client socket
+ * Uses getsockname() to determine which server port the client connected to
  */
-const ServerConfig* ConnectionHandler::getCurrentServerConfig() const {
-    if (_server_configs && !_server_configs->empty()) {
+const ServerConfig* ConnectionHandler::getCurrentServerConfig(int client_sock) const {
+    if (!_server_configs || _server_configs->empty()) {
+        return NULL;
+    }
+    
+    // Get the local address/port of the connected socket
+    struct sockaddr_in local_addr;
+    socklen_t addr_len = sizeof(local_addr);
+    if (getsockname(client_sock, (struct sockaddr*)&local_addr, &addr_len) < 0) {
+        // If we can't determine the port, default to first server config
         return &(*_server_configs)[0];
     }
-    return NULL;
+    
+    int local_port = ntohs(local_addr.sin_port);
+    
+    // Find the server config that matches this port
+    for (size_t i = 0; i < _server_configs->size(); ++i) {
+        if ((*_server_configs)[i].getPort() == local_port) {
+            return &(*_server_configs)[i];
+        }
+    }
+    
+    // If no match found, default to first server config
+    return &(*_server_configs)[0];
 }
 
 /*
@@ -839,3 +931,149 @@ HttpResponse ConnectionHandler::executeCgiScript(const std::string& script_path,
         }
     }
 }
+
+/*
+ * Handle file upload for POST requests with multipart/form-data
+ */
+HttpResponse ConnectionHandler::handleFileUpload(const HttpRequest& request, const Location* location, const std::string& /* uri */) {
+    std::string upload_path = location->getUploadPath();
+    if (upload_path.empty()) {
+        return createErrorResponse(500);
+    }
+    
+    // Create upload directory if it doesn't exist
+    struct stat st;
+    if (stat(upload_path.c_str(), &st) != 0) {
+        if (mkdir(upload_path.c_str(), 0755) != 0) {
+            return createErrorResponse(500);
+        }
+    }
+    
+    std::string body = request.getBody();
+    if (body.empty()) {
+        return createErrorResponse(400);
+    }
+    
+    std::string filename;
+    std::string file_content;
+    
+    // Check if this is multipart/form-data
+    std::string content_type = request.getHeader("Content-Type");
+    if (content_type.find("multipart/form-data") != std::string::npos) {
+        // Extract boundary from Content-Type header
+        size_t boundary_pos = content_type.find("boundary=");
+        if (boundary_pos == std::string::npos) {
+            return createErrorResponse(400);
+        }
+        
+        std::string boundary = "--" + content_type.substr(boundary_pos + 9);
+        
+        // Simple multipart parsing - find file data
+        size_t start_pos = body.find(boundary);
+        if (start_pos == std::string::npos) {
+            return createErrorResponse(400);
+        }
+        
+        // Find the file content between boundaries
+        size_t content_start = body.find("\r\n\r\n", start_pos);
+        if (content_start == std::string::npos) {
+            return createErrorResponse(400);
+        }
+        content_start += 4; // Skip \r\n\r\n
+        
+        size_t content_end = body.find(boundary, content_start);
+        if (content_end == std::string::npos) {
+            return createErrorResponse(400);
+        }
+        content_end -= 2; // Remove \r\n before boundary
+        
+        file_content = body.substr(content_start, content_end - content_start);
+        
+        // Extract filename from Content-Disposition header if present
+        size_t filename_pos = body.find("filename=\"", start_pos);
+        if (filename_pos != std::string::npos && filename_pos < content_start) {
+            filename_pos += 10; // Skip filename="
+            size_t filename_end = body.find("\"", filename_pos);
+            if (filename_end != std::string::npos) {
+                filename = body.substr(filename_pos, filename_end - filename_pos);
+            }
+        }
+    } else {
+        // Regular POST body
+        file_content = body;
+    }
+    
+    // Generate filename if not extracted from multipart
+    if (filename.empty()) {
+        std::ostringstream oss;
+        oss << "upload_" << time(NULL) << ".bin";
+        filename = oss.str();
+    }
+    
+    std::string full_path = upload_path + "/" + filename;
+    
+    // Write file content
+    std::ofstream file(full_path.c_str(), std::ios::binary);
+    if (!file.is_open()) {
+        return createErrorResponse(500);
+    }
+    
+    file.write(file_content.c_str(), file_content.length());
+    file.close();
+    
+    // Return success response with redirect to upload directory
+    std::string response_body = "<!DOCTYPE html><html><head><title>Upload Success</title></head><body>";
+    response_body += "<h1>File Upload Successful</h1>";
+    response_body += "<p>File saved as: " + filename + "</p>";
+    std::ostringstream size_stream;
+    size_stream << file_content.length();
+    response_body += "<p>Size: " + size_stream.str() + " bytes</p>";
+    response_body += "<p><a href=\"/upload/\">View Uploaded Files</a></p>";
+    response_body += "<p><a href=\"/\">Back to Home</a></p>";
+    response_body += "</body></html>";
+    
+    return HttpResponse::createOkResponse(response_body, "text/html");
+}
+
+/*
+ * Creates an error response, checking for custom error pages in common locations
+ * Falls back to default error response if no custom page is found
+ */
+HttpResponse ConnectionHandler::createErrorResponse(int error_code) const {
+    // Try to get custom error page from server configuration
+    if (_server_configs && !_server_configs->empty()) {
+        const ServerConfig& config = (*_server_configs)[0];
+        const std::map<int, std::string>& error_pages = config.getErrorPages();
+        
+        std::map<int, std::string>::const_iterator it = error_pages.find(error_code);
+        if (it != error_pages.end()) {
+            std::string error_page_path = it->second;
+            
+            // Try to load the custom error page
+            std::ifstream error_file(error_page_path.c_str(), std::ios::binary);
+            if (error_file.is_open()) {
+                std::string file_content((std::istreambuf_iterator<char>(error_file)),
+                                        std::istreambuf_iterator<char>());
+                error_file.close();
+                
+                HttpResponse response;
+                response.setStatusCode(error_code);
+                response.setContentType("text/html");
+                response.setBody(file_content);
+                response.setConnection(false);
+                return response;
+            }
+        }
+    }
+    
+    // Fallback to default error responses
+    if (error_code == 404) {
+        return HttpResponse::createNotFoundResponse();
+    } else if (error_code == 500) {
+        return HttpResponse::createServerErrorResponse();
+    } else if (error_code == 403) {
+        return HttpResponse::createForbiddenResponse();
+    }
+    return HttpResponse::createServerErrorResponse();
+}
+

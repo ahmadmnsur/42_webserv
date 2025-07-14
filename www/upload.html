@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .upload-form { max-width: 400px; margin: 20px 0; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="file"] { width: 100%; padding: 8px; }
+        button { background: #4caf50; color: white; padding: 10px 20px; border: none; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .info { background: #f0f8ff; padding: 15px; border-left: 4px solid #2196f3; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>File Upload Test</h1>
+    
+    <div class="info">
+        <h3>Upload Methods:</h3>
+        <p><strong>Method 1:</strong> Use the form below (may have multipart parsing issues)</p>
+        <p><strong>Method 2:</strong> Use curl: <code>curl -X POST http://localhost:8080/upload -d "your content" -H "Content-Type: text/plain"</code></p>
+    </div>
+    
+    <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+        <div class="form-group">
+            <label for="file">Select File:</label>
+            <input type="file" id="file" name="file" required>
+        </div>
+        <button type="submit">Upload File</button>
+    </form>
+    
+    <p><a href="/upload/">View Uploaded Files</a></p>
+    <p><a href="/">Back to Home</a></p>
+</body>
+</html>

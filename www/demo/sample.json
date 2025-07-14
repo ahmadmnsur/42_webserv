@@ -1,0 +1,84 @@
+{
+  "server": "WebServ 42",
+  "version": "1.0",
+  "description": "HTTP/1.1 Server Implementation",
+  "features": [
+    {
+      "name": "HTTP Methods",
+      "supported": ["GET", "POST", "DELETE", "HEAD"],
+      "status": "implemented"
+    },
+    {
+      "name": "Static File Serving",
+      "mime_types": [
+        "text/html",
+        "text/css",
+        "text/javascript",
+        "application/json",
+        "text/plain",
+        "image/png",
+        "image/jpeg"
+      ],
+      "status": "implemented"
+    },
+    {
+      "name": "CGI Support",
+      "interpreters": {
+        "python": "/usr/bin/python3",
+        "php": "/usr/bin/php"
+      },
+      "status": "implemented"
+    },
+    {
+      "name": "File Upload",
+      "max_size": "10MB",
+      "supported_methods": ["POST"],
+      "status": "implemented"
+    },
+    {
+      "name": "Directory Listing",
+      "autoindex": true,
+      "index_files": ["index.html", "index.htm"],
+      "status": "implemented"
+    },
+    {
+      "name": "Error Handling",
+      "error_pages": {
+        "404": "Not Found",
+        "403": "Forbidden",
+        "500": "Internal Server Error",
+        "405": "Method Not Allowed"
+      },
+      "status": "implemented"
+    }
+  ],
+  "configuration": {
+    "syntax": "nginx-inspired",
+    "virtual_hosts": true,
+    "location_blocks": true,
+    "custom_error_pages": true
+  },
+  "performance": {
+    "io_model": "non-blocking",
+    "multiplexing": "select/poll",
+    "concurrent_connections": "multiple"
+  },
+  "compliance": {
+    "http_version": "1.1",
+    "rfc_standards": ["RFC 7230", "RFC 7231"],
+    "cgi_version": "1.1"
+  },
+  "build": {
+    "language": "C++98",
+    "compiler": "g++",
+    "flags": ["-Wall", "-Wextra", "-Werror"],
+    "libraries": ["standard_library_only"]
+  },
+  "test_status": {
+    "basic_http": "✅ passing",
+    "cgi_execution": "✅ passing",
+    "file_upload": "✅ passing",
+    "error_handling": "✅ passing",
+    "stress_test": "✅ passing"
+  }
+}

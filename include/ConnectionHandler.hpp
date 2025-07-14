@@ -22,9 +22,11 @@ private:
     const Location* findMatchingLocation(const std::string& uri) const;
     std::string sanitizePath(const std::string& path) const;
     std::string getMimeType(const std::string& path) const;
-    const ServerConfig* getCurrentServerConfig() const;
+    const ServerConfig* getCurrentServerConfig(int client_sock) const;
     HttpResponse executeCgiScript(const std::string& script_path, const std::string& interpreter_path, 
                                   const HttpRequest& request, const std::string& file_path) const;
+    HttpResponse handleFileUpload(const HttpRequest& request, const Location* location, const std::string& uri);
+    HttpResponse createErrorResponse(int error_code) const;
 
 public:
     ConnectionHandler();

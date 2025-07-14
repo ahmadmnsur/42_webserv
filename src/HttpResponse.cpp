@@ -1,6 +1,8 @@
 #include "HttpResponse.hpp"
 #include <sstream>
 #include <iostream>
+#include <cstdlib>
+#include <cctype>
 
 HttpResponse::HttpResponse() : _status_code(200), _version("HTTP/1.1"), _is_head_response(false) {
     _status_message = getStatusMessage(_status_code);
@@ -229,6 +231,33 @@ HttpResponse HttpResponse::createRequestEntityTooLargeResponse() {
     response.setStatusCode(413);
     response.setContentType("text/html");
     response.setBody("<html><body><h1>413 Payload Too Large</h1><p>The request payload is too large.</p></body></html>");
+    response.setConnection(false);
+    return response;
+}
+
+HttpResponse HttpResponse::createRedirectResponse(const std::string& redirect_info) {
+    HttpResponse response;
+    
+    // Parse redirect info: either "301 URL" or just "URL" (defaults to 301)
+    int status_code = 301;  // Default redirect status
+    std::string url = redirect_info;
+    
+    // Check if the redirect_info starts with a status code
+    size_t space_pos = redirect_info.find(' ');
+    if (space_pos != std::string::npos) {
+        std::string status_str = redirect_info.substr(0, space_pos);
+        // Check if it's a valid 3xx status code
+        if (status_str.length() == 3 && status_str[0] == '3' && 
+            std::isdigit(status_str[1]) && std::isdigit(status_str[2])) {
+            status_code = std::atoi(status_str.c_str());
+            url = redirect_info.substr(space_pos + 1);
+        }
+    }
+    
+    response.setStatusCode(status_code);
+    response.setHeader("Location", url);
+    response.setContentType("text/html");
+    response.setBody("<html><body><h1>" + response.getStatusMessage(status_code) + "</h1><p>The document has moved <a href=\"" + url + "\">here</a>.</p></body></html>");
     response.setConnection(false);
     return response;
 }
