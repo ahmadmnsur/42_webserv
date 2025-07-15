@@ -13,6 +13,8 @@
 #include <cstdlib>
 #include <cstdio>
 
+extern char** environ;
+
 /*
  * Default constructor for ConnectionHandler
  * Initializes the connection handler with empty client map
@@ -533,16 +535,16 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
         std::string full_path = upload_path + "/" + filename;
         
         // Write body content to file
-        FILE* file = fopen(full_path.c_str(), "wb");
-        if (!file) {
+        std::ofstream file(full_path.c_str(), std::ios::binary);
+        if (!file.is_open()) {
             return HttpResponse::createServerErrorResponse();
         }
         
         const std::string& body = request.getBody();
         if (!body.empty()) {
-            fwrite(body.c_str(), 1, body.size(), file);
+            file.write(body.c_str(), body.size());
         }
-        fclose(file);
+        file.close();
         
         // Return success response
         std::string response_body = "PUT request successful\nFile saved to: " + full_path;
@@ -865,10 +867,11 @@ HttpResponse ConnectionHandler::executeCgiScript(const std::string& script_path,
         setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
         
         // Execute the CGI script
-        execl(interpreter_path.c_str(), interpreter_path.c_str(), script_path.c_str(), (char*)NULL);
+        char* args[] = {const_cast<char*>(interpreter_path.c_str()), const_cast<char*>(script_path.c_str()), NULL};
+        execve(interpreter_path.c_str(), args, environ);
         
-        // If execl fails, exit
-        exit(1);
+        // If execve fails, exit
+        std::exit(1);
     } else {
         // Parent process - communicate with CGI
         

@@ -29,21 +29,23 @@ void SignalManager::signalCallback(int signum) {
 /*
  * Setup signal handlers
  */
-void SignalManager::setupSignals() {
+bool SignalManager::setupSignals() {
     if (signal(SIGINT, signalCallback) == SIG_ERR) {
         std::cerr << "Error setting up SIGINT handler" << std::endl;
-        exit(1);
+        return false;
     }
     
     if (signal(SIGTERM, signalCallback) == SIG_ERR) {
         std::cerr << "Error setting up SIGTERM handler" << std::endl;
-        exit(1);
+        return false;
     }
     
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
         std::cerr << "Error ignoring SIGPIPE" << std::endl;
-        exit(1);
+        return false;
     }
+    
+    return true;
 }
 
 /*

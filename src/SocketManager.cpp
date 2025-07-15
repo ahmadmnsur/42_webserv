@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <cstdio>
+#include <algorithm>
 
 /*
  * Default constructor for SocketManager
@@ -26,12 +27,23 @@ bool SocketManager::parseIPAddress(const std::string& host, struct sockaddr_in& 
         return true;
     }
     
+    // Parse IP address manually using C++ string streams
+    std::stringstream ss(host);
+    std::string token;
     unsigned int ip_parts[4];
-    int parsed = sscanf(host.c_str(), "%u.%u.%u.%u", 
-                       &ip_parts[0], &ip_parts[1], &ip_parts[2], &ip_parts[3]);
+    int count = 0;
     
-    if (parsed != 4 || ip_parts[0] > 255 || ip_parts[1] > 255 || 
-        ip_parts[2] > 255 || ip_parts[3] > 255) {
+    while (std::getline(ss, token, '.') && count < 4) {
+        std::stringstream token_ss(token);
+        token_ss >> ip_parts[count];
+        if (token_ss.fail() || !token_ss.eof() || ip_parts[count] > 255) {
+            std::cerr << "Invalid IP address format: " << host << std::endl;
+            return false;
+        }
+        count++;
+    }
+    
+    if (count != 4) {
         std::cerr << "Invalid IP address format: " << host << std::endl;
         return false;
     }
@@ -92,7 +104,7 @@ int SocketManager::createListenSocket(const std::string& host, int port) {
     }
     
     struct sockaddr_in addr;
-    std::memset(&addr, 0, sizeof(addr));
+    std::fill(reinterpret_cast<char*>(&addr), reinterpret_cast<char*>(&addr) + sizeof(addr), 0);
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     

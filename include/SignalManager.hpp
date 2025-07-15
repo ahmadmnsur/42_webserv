@@ -12,7 +12,7 @@ public:
     SignalManager();
     ~SignalManager();
     
-    void setupSignals();
+    bool setupSignals();
     bool isShutdownRequested() const;
     void resetSignals(); // Reset to default handlers
 };

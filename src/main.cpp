@@ -10,7 +10,10 @@
 int main(int argc, char* argv[]) {
     // Create signal manager on the stack (no memory leaks!)
     SignalManager signalManager;
-    signalManager.setupSignals();
+    if (!signalManager.setupSignals()) {
+        std::cerr << "Failed to setup signal handlers" << std::endl;
+        return 1;
+    }
     
     // Set default configuration file name
     std::string config_file = "webserv.conf";
