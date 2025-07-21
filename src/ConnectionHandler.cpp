@@ -13,7 +13,6 @@
 #include <cstdlib>
 #include <cstdio>
 
-extern char** environ;
 
 /*
  * Default constructor for ConnectionHandler
@@ -510,8 +509,56 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
             }
         }
     } else if (method == "DELETE") {
-        std::string body = "DELETE request received\nURI: " + sanitized_uri;
-        return HttpResponse::createOkResponse(body, "text/plain");
+        // Handle DELETE request - delete file from upload path
+        std::string upload_path = location->getUploadPath();
+        if (upload_path.empty()) {
+            return HttpResponse::createBadRequestResponse();
+        }
+        
+        // Construct the full file path
+        std::string file_path = upload_path;
+        if (file_path[file_path.length() - 1] != '/') {
+            file_path += "/";
+        }
+        
+        // Extract filename from URI (remove leading /upload/ or similar)
+        std::string filename = sanitized_uri;
+        size_t last_slash = filename.find_last_of('/');
+        if (last_slash != std::string::npos) {
+            filename = filename.substr(last_slash + 1);
+        }
+        
+        // URL decode the filename
+        filename = urlDecode(filename);
+        
+        // Security check - ensure filename doesn't contain path traversal
+        if (filename.find("..") != std::string::npos || 
+            filename.find("/") != std::string::npos || 
+            filename.find("\\") != std::string::npos ||
+            filename.empty()) {
+            return HttpResponse::createBadRequestResponse();
+        }
+        
+        file_path += filename;
+        
+        // Check if file exists
+        struct stat st;
+        if (stat(file_path.c_str(), &st) != 0) {
+            return createErrorResponse(404);
+        }
+        
+        // Check if it's a regular file (not a directory)
+        if (!S_ISREG(st.st_mode)) {
+            return HttpResponse::createBadRequestResponse();
+        }
+        
+        // Attempt to delete the file
+        if (unlink(file_path.c_str()) == 0) {
+            std::string body = "File deleted successfully: " + filename;
+            return HttpResponse::createOkResponse(body, "text/plain");
+        } else {
+            return HttpResponse::createServerErrorResponse();
+        }
     } else if (method == "PUT") {
         // Handle PUT request - save file to upload path
         std::string upload_path = location->getUploadPath();
@@ -685,13 +732,9 @@ const Location* ConnectionHandler::findMatchingLocation(const std::string& uri) 
         
         // Check if URI matches location path
         if (location_path == "/") {
-            // Root location only matches exactly "/"
-            if (uri == "/") {
-                if (location_path.length() > best_match_length) {
-                    best_match = &location;
-                    best_match_length = location_path.length();
-                }
-            }
+            // Root location matches everything
+            best_match = &location;
+            best_match_length = location_path.length();
         } else if (uri.find(location_path) == 0) {
             // Non-root locations: exact match or followed by '/'
             if (uri.length() == location_path.length() || 
@@ -742,6 +785,33 @@ std::string ConnectionHandler::sanitizePath(const std::string& path) const {
     }
     
     return path;  // Path is safe
+}
+
+/*
+ * URL decode function to handle percent-encoded characters
+ * Converts %20 to space, %28 to (, %29 to ), etc.
+ */
+std::string ConnectionHandler::urlDecode(const std::string& encoded) const {
+    std::string decoded;
+    for (size_t i = 0; i < encoded.length(); ++i) {
+        if (encoded[i] == '%' && i + 2 < encoded.length()) {
+            std::string hex = encoded.substr(i + 1, 2);
+            // Convert hex to decimal
+            char* end;
+            long value = strtol(hex.c_str(), &end, 16);
+            if (*end == '\0' && value >= 0 && value <= 255) {
+                decoded += static_cast<char>(value);
+                i += 2;
+            } else {
+                decoded += encoded[i];
+            }
+        } else if (encoded[i] == '+') {
+            decoded += ' ';
+        } else {
+            decoded += encoded[i];
+        }
+    }
+    return decoded;
 }
 
 /*
@@ -856,19 +926,31 @@ HttpResponse ConnectionHandler::executeCgiScript(const std::string& script_path,
         close(pipefd_out[0]);
         close(pipefd_out[1]);
         
-        // Set environment variables for CGI
-        setenv("REQUEST_METHOD", request.getMethod().c_str(), 1);
-        setenv("CONTENT_TYPE", request.getHeader("Content-Type").c_str(), 1);
-        setenv("CONTENT_LENGTH", request.getHeader("Content-Length").c_str(), 1);
-        setenv("SCRIPT_NAME", script_path.c_str(), 1);
-        setenv("PATH_INFO", file_path.c_str(), 1);
-        setenv("QUERY_STRING", "", 1);  // No query string for now
-        setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
-        setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
+        // Create custom environment array for CGI
+        std::vector<std::string> env_strings;
+        env_strings.push_back("REQUEST_METHOD=" + request.getMethod());
+        env_strings.push_back("CONTENT_TYPE=" + request.getHeader("Content-Type"));
+        env_strings.push_back("CONTENT_LENGTH=" + request.getHeader("Content-Length"));
+        env_strings.push_back("SCRIPT_NAME=" + script_path);
+        env_strings.push_back("PATH_INFO=" + file_path);
+        env_strings.push_back("QUERY_STRING=");  // No query string for now
+        env_strings.push_back("SERVER_PROTOCOL=HTTP/1.1");
+        env_strings.push_back("GATEWAY_INTERFACE=CGI/1.1");
+        env_strings.push_back("SERVER_NAME=localhost");
+        env_strings.push_back("SERVER_PORT=8080");
+        env_strings.push_back("PATH=/usr/bin:/bin");
+        
+        // Convert to char* array
+        std::vector<char*> 
+        env_array;
+        for (size_t i = 0; i < env_strings.size(); ++i) {
+            env_array.push_back(const_cast<char*>(env_strings[i].c_str()));
+        }
+        env_array.push_back(NULL);
         
         // Execute the CGI script
         char* args[] = {const_cast<char*>(interpreter_path.c_str()), const_cast<char*>(script_path.c_str()), NULL};
-        execve(interpreter_path.c_str(), args, environ);
+        execve(interpreter_path.c_str(), args, &env_array[0]);
         
         // If execve fails, exit
         std::exit(1);
@@ -1079,4 +1161,3 @@ HttpResponse ConnectionHandler::createErrorResponse(int error_code) const {
     }
     return HttpResponse::createServerErrorResponse();
 }
-

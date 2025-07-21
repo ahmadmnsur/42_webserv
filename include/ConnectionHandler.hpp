@@ -27,6 +27,7 @@ private:
                                   const HttpRequest& request, const std::string& file_path) const;
     HttpResponse handleFileUpload(const HttpRequest& request, const Location* location, const std::string& uri);
     HttpResponse createErrorResponse(int error_code) const;
+    std::string urlDecode(const std::string& encoded) const;
 
 public:
     ConnectionHandler();
