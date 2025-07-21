@@ -5,7 +5,7 @@
 #include <cctype>
 #include <vector>
 
-HttpRequest::HttpRequest() : _is_complete(false), _is_valid(false), _error_code(0) {}
+HttpRequest::HttpRequest() : _is_complete(false), _is_valid(false), _error_code(0), _bytes_consumed(0) {}
 
 HttpRequest::~HttpRequest() {}
 
@@ -39,6 +39,12 @@ bool HttpRequest::isValidVersion(const std::string& version) const {
 }
 
 bool HttpRequest::parseRequestLine(const std::string& line) {
+    // Check for empty line
+    if (line.empty() || trim(line).empty()) {
+        _error_code = 400; // Bad Request for empty request line
+        return false;
+    }
+    
     // Check for multiple consecutive spaces which istringstream would normalize
     if (line.find("  ") != std::string::npos) {
         _error_code = 400; // Bad Request for multiple spaces
@@ -230,6 +236,7 @@ bool HttpRequest::parse(const std::string& raw_request) {
     }
     
     if (!parseRequestLine(line)) {
+        _is_valid = false; // Mark as invalid when request line parsing fails
         return false;
     }
     
@@ -313,6 +320,13 @@ bool HttpRequest::parse(const std::string& raw_request) {
             } else {
                 // More data might be coming - mark as incomplete for timeout handling
                 _is_complete = false;
+                // For incomplete requests, calculate how much we can consume (headers + partial body)
+                size_t header_end = raw_request.find("\r\n\r\n");
+                if (header_end != std::string::npos) {
+                    _bytes_consumed = header_end + 4 + _body.size();
+                } else {
+                    _bytes_consumed = 0; // Don't consume anything if headers aren't complete
+                }
             }
         } else {
             // Exact match - request is complete
@@ -337,6 +351,13 @@ bool HttpRequest::parse(const std::string& raw_request) {
         if (!is_get_with_content_length) {
             _error_code = 400; // Bad Request for missing Host header
             _is_valid = false;
+            // For failed requests, consume what we parsed so far
+            size_t header_end = raw_request.find("\r\n\r\n");
+            if (header_end != std::string::npos) {
+                _bytes_consumed = header_end + 4 + _body.size();
+            } else {
+                _bytes_consumed = raw_request.size();
+            }
             return false;
         }
     }
@@ -344,7 +365,23 @@ bool HttpRequest::parse(const std::string& raw_request) {
     // Validate POST request requirements
     if (!validatePostRequest()) {
         _is_valid = false;
+        // Calculate bytes consumed even for invalid requests
+        size_t header_end = raw_request.find("\r\n\r\n");
+        if (header_end != std::string::npos) {
+            _bytes_consumed = header_end + 4 + _body.size();
+        } else {
+            _bytes_consumed = raw_request.size();
+        }
         return true; // Return true so it's processed as invalid, not incomplete
+    }
+    
+    // Calculate bytes consumed for valid complete requests
+    size_t header_end = raw_request.find("\r\n\r\n");
+    if (header_end != std::string::npos) {
+        _bytes_consumed = header_end + 4 + _body.size();
+    } else {
+        // No body separator found - consume entire request
+        _bytes_consumed = raw_request.size();
     }
     
     _is_valid = true;
@@ -360,6 +397,7 @@ void HttpRequest::clear() {
     _is_complete = false;
     _is_valid = false;
     _error_code = 0;
+    _bytes_consumed = 0;
 }
 
 const std::string& HttpRequest::getMethod() const {
@@ -450,4 +488,8 @@ bool HttpRequest::validatePostRequest() const {
 
 int HttpRequest::getErrorCode() const {
     return _error_code;
+}
+
+size_t HttpRequest::getBytesConsumed() const {
+    return _bytes_consumed;
 }

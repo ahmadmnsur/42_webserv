@@ -5,7 +5,7 @@
  * Default constructor for ClientData
  * Initializes with empty buffers and zero bytes sent
  */
-ClientData::ClientData() : _bytes_sent(0), _connection_time(time(NULL)), _keep_alive(false) {}
+ClientData::ClientData() : _bytes_sent(0), _connection_time(time(NULL)), _last_activity_time(time(NULL)), _keep_alive(false) {}
 
 /*
  * Destructor for ClientData
@@ -44,6 +44,14 @@ size_t ClientData::getBytesSent() const {
  */
 time_t ClientData::getConnectionTime() const {
     return _connection_time;
+}
+
+/*
+ * Returns the last activity time for this client
+ * Used for timeout handling after request processing
+ */
+time_t ClientData::getLastActivityTime() const {
+    return _last_activity_time;
 }
 
 // Setters
@@ -118,4 +126,20 @@ bool ClientData::isKeepAlive() const {
  */
 void ClientData::setKeepAlive(bool keep_alive) {
     _keep_alive = keep_alive;
+}
+
+/*
+ * Resets the connection time to current time
+ * Used for keep-alive connections to restart timeout counter
+ */
+void ClientData::resetConnectionTime() {
+    _connection_time = time(NULL);
+}
+
+/*
+ * Updates the last activity time to current time
+ * Used to track when the client last sent data or we processed a request
+ */
+void ClientData::updateLastActivity() {
+    _last_activity_time = time(NULL);
 }

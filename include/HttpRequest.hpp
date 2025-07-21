@@ -15,6 +15,7 @@ private:
     bool _is_complete;
     bool _is_valid;
     int _error_code; // 0 = no error, 400 = bad request, 405 = method not allowed, 411 = length required
+    size_t _bytes_consumed; // Track how many bytes were consumed during parsing
     
     std::string toLowerCase(const std::string& str) const;
     std::string trim(const std::string& str) const;
@@ -46,6 +47,7 @@ public:
     size_t getContentLength() const;
     bool isKeepAlive() const;
     int getErrorCode() const;
+    size_t getBytesConsumed() const;
 };
 
 #endif
