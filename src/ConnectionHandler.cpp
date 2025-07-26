@@ -613,10 +613,8 @@ HttpResponse ConnectionHandler::processHttpRequest(const HttpRequest& request) {
             return HttpResponse::createBadRequestResponse();
         }
         
-        // Attempt to delete the file by truncating to zero size then closing
-        int fd = open(file_path.c_str(), O_WRONLY | O_TRUNC);
-        if (fd >= 0) {
-            close(fd);
+        // Attempt to delete the file using remove
+        if (remove(file_path.c_str()) == 0) {
             std::string body = "File deleted successfully: " + filename;
             return HttpResponse::createOkResponse(body, "text/plain");
         } else {
