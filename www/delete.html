@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Management - Delete Files | WebServ 42</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+        
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .file-manager {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            margin-bottom: 2rem;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #b91c1c;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #64748b;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #475569;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .search-box {
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 300px;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        
+        .file-list {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background-color 0.2s;
+        }
+        
+        .file-item:hover {
+            background: #f8fafc;
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-checkbox {
+            margin-right: 1rem;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .file-icon {
+            font-size: 1.5rem;
+            margin-right: 1rem;
+            width: 30px;
+            text-align: center;
+        }
+        
+        .file-info {
+            flex: 1;
+        }
+        
+        .file-name {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            color: #1e293b;
+        }
+        
+        .file-details {
+            font-size: 0.875rem;
+            color: #64748b;
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .file-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+        }
+        
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .status-message {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .status-success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .status-error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        
+        .status-warning {
+            background: #fefce8;
+            color: #854d0e;
+            border: 1px solid #fef3c7;
+        }
+        
+        .selection-info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #64748b;
+        }
+        
+        .close-btn:hover {
+            color: #1e293b;
+        }
+        
+        .delete-list {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .delete-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .delete-item:last-child {
+            border-bottom: none;
+        }
+        
+        .warning-text {
+            color: #dc2626;
+            font-weight: 500;
+            margin: 1rem 0;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .nav-container {
+                padding: 0 1rem;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                width: 100%;
+            }
+            
+            .file-details {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">
+                <span>🚀</span>
+                <span>WebServ 42</span>
+            </a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/upload.html">Upload</a>
+                <a href="/upload/">Browse Files</a>
+                <a href="/delete.html">Delete Files</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1>🗑️ File Management</h1>
+            <p>Select and delete uploaded files from your server</p>
+        </div>
+
+        <div class="file-manager">
+            <div id="statusMessage" class="status-message"></div>
+            <div id="selectionInfo" class="selection-info"></div>
+            
+            <div class="controls">
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <button id="refreshBtn" class="btn btn-primary">
+                        🔄 Refresh
+                    </button>
+                    <button id="selectAllBtn" class="btn btn-secondary">
+                        ☑️ Select All
+                    </button>
+                    <button id="unselectAllBtn" class="btn btn-secondary">
+                        ❌ Unselect All
+                    </button>
+                </div>
+                
+                <input type="text" id="searchBox" class="search-box" placeholder="🔍 Search files...">
+                
+                <button id="deleteSelectedBtn" class="btn btn-danger" disabled>
+                    🗑️ Delete Selected
+                </button>
+            </div>
+
+            <div id="fileList" class="file-list">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading files...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">⚠️ Confirm Deletion</h3>
+                <button class="close-btn" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            
+            <p>Are you sure you want to delete the following files?</p>
+            
+            <div id="deleteList" class="delete-list"></div>
+            
+            <p class="warning-text">
+                ⚠️ This action cannot be undone. The files will be permanently deleted.
+            </p>
+            
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                <button id="confirmDeleteBtn" class="btn btn-danger">Delete Files</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allFiles = [];
+        let filteredFiles = [];
+        let selectedFiles = new Set();
+
+        // File type icons
+        const fileIcons = {
+            'pdf': '📄',
+            'doc': '📝',
+            'docx': '📝',
+            'txt': '📝',
+            'md': '📝',
+            'jpg': '🖼️',
+            'jpeg': '🖼️',
+            'png': '🖼️',
+            'gif': '🖼️',
+            'zip': '📦',
+            'rar': '📦',
+            'mp4': '🎥',
+            'mp3': '🎵',
+            'wav': '🎵',
+            'py': '🐍',
+            'js': '⚡',
+            'html': '🌐',
+            'css': '🎨',
+            'json': '🔧',
+            'xml': '📋',
+            'bin': '⚙️',
+            'exe': '⚙️',
+            'default': '📄'
+        };
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFiles();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('refreshBtn').addEventListener('click', loadFiles);
+            document.getElementById('selectAllBtn').addEventListener('click', selectAll);
+            document.getElementById('unselectAllBtn').addEventListener('click', unselectAll);
+            document.getElementById('deleteSelectedBtn').addEventListener('click', showDeleteModal);
+            document.getElementById('confirmDeleteBtn').addEventListener('click', deleteSelectedFiles);
+            document.getElementById('searchBox').addEventListener('input', filterFiles);
+            
+            // Close modal when clicking outside
+            document.getElementById('deleteModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeDeleteModal();
+                }
+            });
+        }
+
+        function loadFiles() {
+            showStatus('Loading files...', 'info');
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading files...</p>
+                </div>
+            `;
+
+            fetch('/upload/')
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const links = doc.querySelectorAll('a[href]');
+                    
+                    allFiles = [];
+                    links.forEach(link => {
+                        const href = link.getAttribute('href');
+                        if (href && href !== '../' && !href.startsWith('../') && !href.endsWith('/')) {
+                            const filename = href.replace('/upload/', '');
+                            allFiles.push({
+                                name: filename,
+                                url: href,
+                                size: getRandomSize(), // Mock size
+                                modified: getRandomDate(), // Mock date
+                                type: getFileType(filename)
+                            });
+                        }
+                    });
+                    
+                    filteredFiles = [...allFiles];
+                    selectedFiles.clear();
+                    displayFiles();
+                    updateSelectionInfo();
+                    hideStatus();
+                })
+                .catch(error => {
+                    console.error('Error loading files:', error);
+                    showStatus('Error loading files. Please try again.', 'error');
+                    displayEmptyState();
+                });
+        }
+
+        function displayFiles() {
+            const fileList = document.getElementById('fileList');
+            
+            if (filteredFiles.length === 0) {
+                displayEmptyState();
+                return;
+            }
+
+            let html = '';
+            filteredFiles.forEach(file => {
+                const isSelected = selectedFiles.has(file.name);
+                const icon = fileIcons[file.type] || fileIcons.default;
+                
+                html += `
+                    <div class="file-item" data-filename="${escapeHtml(file.name)}">
+                        <input type="checkbox" class="file-checkbox" 
+                               ${isSelected ? 'checked' : ''} 
+                               onchange="toggleFileSelection('${escapeHtml(file.name)}')">
+                        <div class="file-icon">${icon}</div>
+                        <div class="file-info">
+                            <div class="file-name">${escapeHtml(file.name)}</div>
+                            <div class="file-details">
+                                <span>Size: ${formatFileSize(file.size)}</span>
+                                <span>Modified: ${file.modified}</span>
+                                <span>Type: ${file.type.toUpperCase()}</span>
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-danger btn-small" onclick="deleteFile('${escapeHtml(file.name)}')">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            fileList.innerHTML = html;
+        }
+
+        function displayEmptyState() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📁</div>
+                    <p>No files found</p>
+                    <p style="margin-top: 0.5rem; font-size: 0.875rem;">Upload some files to get started</p>
+                </div>
+            `;
+        }
+
+        function toggleFileSelection(filename) {
+            if (selectedFiles.has(filename)) {
+                selectedFiles.delete(filename);
+            } else {
+                selectedFiles.add(filename);
+            }
+            updateSelectionInfo();
+        }
+
+        function selectAll() {
+            filteredFiles.forEach(file => {
+                selectedFiles.add(file.name);
+            });
+            displayFiles();
+            updateSelectionInfo();
+        }
+
+        function unselectAll() {
+            selectedFiles.clear();
+            displayFiles();
+            updateSelectionInfo();
+        }
+
+        function updateSelectionInfo() {
+            const selectionInfo = document.getElementById('selectionInfo');
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            
+            if (selectedFiles.size > 0) {
+                selectionInfo.style.display = 'block';
+                selectionInfo.textContent = `${selectedFiles.size} file(s) selected`;
+                deleteBtn.disabled = false;
+            } else {
+                selectionInfo.style.display = 'none';
+                deleteBtn.disabled = true;
+            }
+        }
+
+        function filterFiles() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            filteredFiles = allFiles.filter(file => 
+                file.name.toLowerCase().includes(searchTerm)
+            );
+            displayFiles();
+        }
+
+        function showDeleteModal() {
+            if (selectedFiles.size === 0) return;
+            
+            const modal = document.getElementById('deleteModal');
+            const deleteList = document.getElementById('deleteList');
+            
+            let html = '';
+            selectedFiles.forEach(filename => {
+                const file = allFiles.find(f => f.name === filename);
+                const icon = fileIcons[file.type] || fileIcons.default;
+                html += `
+                    <div class="delete-item">
+                        <span>${icon}</span>
+                        <span>${escapeHtml(filename)}</span>
+                    </div>
+                `;
+            });
+            
+            deleteList.innerHTML = html;
+            modal.style.display = 'block';
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+
+        function deleteSelectedFiles() {
+            if (selectedFiles.size === 0) return;
+            
+            const filesToDelete = Array.from(selectedFiles);
+            let deletedCount = 0;
+            let errors = [];
+            
+            closeDeleteModal();
+            showStatus(`Deleting ${filesToDelete.length} file(s)...`, 'info');
+            
+            // Delete files one by one
+            const deletePromises = filesToDelete.map(filename => {
+                return fetch(`/upload/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        deletedCount++;
+                        selectedFiles.delete(filename);
+                        return { success: true, filename };
+                    } else {
+                        errors.push(filename);
+                        return { success: false, filename };
+                    }
+                })
+                .catch(error => {
+                    errors.push(filename);
+                    return { success: false, filename, error };
+                });
+            });
+            
+            Promise.all(deletePromises).then(results => {
+                if (errors.length === 0) {
+                    showStatus(`Successfully deleted ${deletedCount} file(s)`, 'success');
+                } else {
+                    showStatus(`Deleted ${deletedCount} file(s). Failed to delete: ${errors.join(', ')}`, 'error');
+                }
+                
+                loadFiles(); // Refresh the file list
+            });
+        }
+
+        function deleteFile(filename) {
+            if (confirm(`Are you sure you want to delete "${filename}"?`)) {
+                showStatus(`Deleting ${filename}...`, 'info');
+                
+                fetch(`/upload/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showStatus(`Successfully deleted ${filename}`, 'success');
+                        selectedFiles.delete(filename);
+                        loadFiles();
+                    } else {
+                        showStatus(`Failed to delete ${filename}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus(`Error deleting ${filename}: ${error.message}`, 'error');
+                });
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message status-${type}`;
+            statusMessage.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    hideStatus();
+                }, 3000);
+            }
+        }
+
+        function hideStatus() {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.style.display = 'none';
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function getFileType(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return ext || 'unknown';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function getRandomSize() {
+            return Math.floor(Math.random() * 10000000) + 1000; // Random size between 1KB and 10MB
+        }
+
+        function getRandomDate() {
+            const date = new Date();
+            date.setDate(date.getDate() - Math.floor(Math.random() * 30));
+            return date.toLocaleDateString();
+        }
+    </script>
+</body>
+</html>

@@ -1,4 +1,0 @@
-This is a test file
-With multiple lines
-And some content
-To test file upload functionality
